@@ -8,27 +8,37 @@ import {
   MAX_ASSETS_PER_MUSICIAN,
   validateUploadFile,
 } from "@/lib/assets/validation";
-import {
-  isWordPressConfigured,
-  uploadToWordPressMedia,
-} from "@/lib/wordpress/media-upload";
 import { makeStoredFilename } from "@/lib/utils/file";
 import { slugifyWithFallback } from "@/lib/utils/slugify";
 
 export const runtime = "nodejs";
 
 /**
- * Standing asset upload:
- *   browser → this route → WordPress REST API (/wp/v2/media) → ConoHa uploads
- *   → metadata insert into Supabase standing_assets.
+ * LEGACY — LOCAL DEVELOPMENT FALLBACK ONLY.
  *
- * Protected by the upload password gate (separate from the download one).
- * The WordPress Application Password stays server-side.
+ * The production upload path is the WordPress custom endpoint on ConoHa
+ * (NEXT_PUBLIC_WORDPRESS_ASSET_UPLOAD_ENDPOINT, implemented in
+ * wordpress-plugin/emn-musicians-assets). Vercel serverless request bodies
+ * are limited to ~4.5MB, so this route must never be the main path for
+ * 20MB standing assets.
  *
- * NOTE (Vercel): serverless request bodies are limited to ~4.5MB on Vercel,
- * so 20MB uploads only work when self-hosted / local. See README.
+ * In production this route always answers 410 Gone. In development it
+ * simulates the WordPress upload (no file is stored anywhere) so the form
+ * can be exercised without a WordPress instance. Field names mirror the
+ * WordPress endpoint (snake_case).
  */
 export async function POST(request: NextRequest) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "This route is retired. Uploads go directly to the WordPress endpoint (NEXT_PUBLIC_WORDPRESS_ASSET_UPLOAD_ENDPOINT).",
+      },
+      { status: 410 },
+    );
+  }
+
   if (!(await hasValidAccess("asset-upload"))) {
     return NextResponse.json(
       { ok: false, error: "アップロード用パスワードでの認証が必要です。" },
@@ -54,8 +64,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const musicianField = text(form, "musicianId"); // "<id>::<slug>"
-  const [musicianId, musicianSlug = ""] = musicianField.split("::");
+  const musicianId = text(form, "musician_id");
+  const musicianSlug = text(form, "musician_slug");
   const title = text(form, "title");
   const consent = text(form, "consent") === "true";
 
@@ -89,54 +99,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         ok: false,
-        error: `1人あたりの素材登録は最大${MAX_ASSETS_PER_MUSICIAN}件です。不要な素材を整理してから登録してください。`,
+        error: `1人あたりの素材登録は最大${MAX_ASSETS_PER_MUSICIAN}件です。`,
       },
       { status: 400 },
     );
   }
 
-  const visibilityInput = text(form, "visibility");
   const visibility =
-    visibilityInput === "public" ? ("public" as const) : ("members_only" as const);
-
+    text(form, "visibility") === "public"
+      ? ("public" as const)
+      : ("members_only" as const);
   const storedFilename = makeStoredFilename(
     slugifyWithFallback(musicianSlug, "asset"),
     validation.extension,
   );
 
-  // 1) Upload the file to WordPress (or simulate in local development).
-  let fileUrl: string;
-  let wpMediaId: number | null = null;
-  let simulated = false;
-  if (isWordPressConfigured()) {
-    try {
-      const uploaded = await uploadToWordPressMedia({
-        fileBuffer: await file.arrayBuffer(),
-        storedFilename,
-        mimeType: file.type,
-        title: `${title} (standing asset)`,
-      });
-      fileUrl = uploaded.sourceUrl;
-      wpMediaId = uploaded.mediaId;
-    } catch (error) {
-      console.error("WordPress upload failed:", error);
-      return NextResponse.json(
-        { ok: false, error: "WordPressへのアップロードに失敗しました。" },
-        { status: 502 },
-      );
-    }
-  } else if (process.env.NODE_ENV !== "production") {
-    simulated = true;
-    fileUrl = `https://wordpress.example.invalid/wp-content/uploads/${storedFilename}`;
-  } else {
-    return NextResponse.json(
-      { ok: false, error: "WordPressアップロードがサーバーに設定されていません。" },
-      { status: 503 },
-    );
-  }
+  // Simulated URL — no file is actually stored by this dev fallback.
+  const fileUrl = `https://wordpress.example.invalid/wp-content/uploads/${storedFilename}`;
 
-  // 2) Save metadata into Supabase.
-  const warnings: string[] = [];
+  const warnings: string[] = [
+    "開発用シミュレーション: 実ファイルはどこにも保存されていません。",
+  ];
   let assetId: string | null = null;
   try {
     const created = await createStandingAsset({
@@ -145,20 +128,20 @@ export async function POST(request: NextRequest) {
       description: nullable(text(form, "description")),
       fileUrl,
       storageBackend: "wordpress_media",
-      wpMediaId,
+      wpMediaId: null,
       originalFilename: file.name,
       storedFilename,
       mimeType: file.type,
       fileSizeBytes: file.size,
       visibility,
-      accessNote: nullable(text(form, "accessNote")),
-      allowCreditUse: text(form, "allowCreditUse") === "true",
-      allowThumbnailUse: text(form, "allowThumbnailUse") === "true",
-      allowCropping: text(form, "allowCropping") === "true",
-      allowColorAdjustment: text(form, "allowColorAdjustment") === "true",
-      requireCredit: text(form, "requireCredit") === "true",
-      creditText: nullable(text(form, "creditText")),
-      usageTerms: nullable(text(form, "usageTerms")),
+      accessNote: nullable(text(form, "access_note")),
+      allowCreditUse: text(form, "allow_credit_use") === "true",
+      allowThumbnailUse: text(form, "allow_thumbnail_use") === "true",
+      allowCropping: text(form, "allow_cropping") === "true",
+      allowColorAdjustment: text(form, "allow_color_adjustment") === "true",
+      requireCredit: text(form, "require_credit") === "true",
+      creditText: nullable(text(form, "credit_text")),
+      usageTerms: nullable(text(form, "usage_terms")),
     });
     if (created) {
       assetId = created.id;
@@ -169,16 +152,15 @@ export async function POST(request: NextRequest) {
     }
   } catch (error) {
     console.error("Metadata insert failed:", error);
-    warnings.push(
-      "ファイルはアップロードされましたが、metadataの保存に失敗しました。管理者に連絡してください。",
-    );
+    warnings.push("metadataの保存に失敗しました。");
   }
 
   return NextResponse.json({
     ok: true,
-    assetId,
-    fileUrl,
-    simulated,
+    asset_id: assetId,
+    file_url: fileUrl,
+    stored_filename: storedFilename,
+    simulated: true,
     warnings,
   });
 }

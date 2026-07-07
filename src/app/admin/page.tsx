@@ -3,7 +3,6 @@ import Link from "next/link";
 import { isAccessConfigured, isUsingDevFallbackPassword } from "@/lib/assets/access";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { hasSupabaseServiceRole } from "@/lib/supabase/server";
-import { isWordPressConfigured } from "@/lib/wordpress/media-upload";
 
 export const metadata: Metadata = {
   title: "Admin",
@@ -17,6 +16,7 @@ export const dynamic = "force-dynamic";
  * Musician data is managed via SQL / Supabase dashboard / import script.
  */
 export default function AdminPage() {
+  const uploadEndpoint = process.env.NEXT_PUBLIC_WORDPRESS_ASSET_UPLOAD_ENDPOINT;
   const rows: { label: string; ok: boolean; note: string }[] = [
     {
       label: "Supabase",
@@ -28,11 +28,11 @@ export default function AdminPage() {
         : "未設定 — mockデータで表示中",
     },
     {
-      label: "WordPress upload",
-      ok: isWordPressConfigured(),
-      note: isWordPressConfigured()
-        ? "設定済み"
-        : "未設定 — 開発中はアップロードをシミュレートします",
+      label: "WordPress upload endpoint",
+      ok: Boolean(uploadEndpoint),
+      note: uploadEndpoint
+        ? "設定済み — ブラウザからWordPressへ直接アップロード"
+        : "未設定 — 開発時はローカルAPIでシミュレートします",
     },
     {
       label: "Download password",

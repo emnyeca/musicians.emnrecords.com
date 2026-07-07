@@ -23,16 +23,29 @@ export type UploadMusicianOption = {
 type UploadResult = {
   ok: boolean;
   error?: string;
-  fileUrl?: string;
+  asset_id?: string | null;
+  file_url?: string;
   simulated?: boolean;
   warnings?: string[];
 };
 
 /**
- * Standing asset upload form (upload-password protected page).
- * The file goes browser → Next.js API route → WordPress REST API; the
- * WordPress Application Password never leaves the server.
+ * Standing asset upload form.
+ *
+ * The file is POSTed directly from the browser to the WordPress custom
+ * endpoint on ConoHa (NEXT_PUBLIC_WORDPRESS_ASSET_UPLOAD_ENDPOINT) so that
+ * 20MB uploads never pass through Vercel. The endpoint verifies the shared
+ * upload password server-side; Supabase secrets stay on the WordPress server.
+ *
+ * When the endpoint env var is not set (local development), the form falls
+ * back to the legacy simulation route /api/upload-standing-asset.
  */
+
+const WORDPRESS_UPLOAD_ENDPOINT =
+  process.env.NEXT_PUBLIC_WORDPRESS_ASSET_UPLOAD_ENDPOINT;
+
+const LEGACY_DEV_FALLBACK_ENDPOINT = "/api/upload-standing-asset";
+
 export function StandingAssetUploadForm({
   musicians,
 }: {
@@ -45,6 +58,9 @@ export function StandingAssetUploadForm({
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
+
+  const usingFallback = !WORDPRESS_UPLOAD_ENDPOINT;
+  const endpoint = WORDPRESS_UPLOAD_ENDPOINT ?? LEGACY_DEV_FALLBACK_ENDPOINT;
 
   function handleFileChange(selected: File | null) {
     setClientError(null);
@@ -78,14 +94,23 @@ export function StandingAssetUploadForm({
     const form = e.currentTarget;
     const data = new FormData(form);
     data.set("file", file);
+    data.set("consent", consented ? "true" : "false");
+
+    // musician select carries "<id>::<slug>" — split for the endpoint.
+    const musicianRef = data.get("musician_ref");
+    data.delete("musician_ref");
+    const [musicianId = "", musicianSlug = ""] =
+      typeof musicianRef === "string" ? musicianRef.split("::") : [];
+    data.set("musician_id", musicianId);
+    data.set("musician_slug", musicianSlug);
+
     // Checkboxes as explicit "true"/"false" strings for the server.
     for (const key of [
-      "allowCreditUse",
-      "allowThumbnailUse",
-      "allowCropping",
-      "allowColorAdjustment",
-      "requireCredit",
-      "consent",
+      "allow_credit_use",
+      "allow_thumbnail_use",
+      "allow_cropping",
+      "allow_color_adjustment",
+      "require_credit",
     ]) {
       const el = form.elements.namedItem(key);
       const checked = el instanceof HTMLInputElement ? el.checked : false;
@@ -93,11 +118,16 @@ export function StandingAssetUploadForm({
     }
 
     try {
-      const response = await fetch("/api/upload-standing-asset", {
-        method: "POST",
-        body: data,
-      });
-      const body = (await response.json()) as UploadResult;
+      const response = await fetch(endpoint, { method: "POST", body: data });
+      let body: UploadResult;
+      try {
+        body = (await response.json()) as UploadResult;
+      } catch {
+        body = {
+          ok: false,
+          error: `サーバーから不正な応答が返りました（HTTP ${response.status}）。`,
+        };
+      }
       setResult(body);
       if (body.ok) {
         formRef.current?.reset();
@@ -106,7 +136,11 @@ export function StandingAssetUploadForm({
         setRequireCredit(false);
       }
     } catch {
-      setResult({ ok: false, error: "通信に失敗しました。" });
+      setResult({
+        ok: false,
+        error:
+          "通信に失敗しました。WordPress endpointの設定（CORS含む）を確認してください。",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -130,7 +164,12 @@ export function StandingAssetUploadForm({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <Label htmlFor="upload-musician">ミュージシャン *</Label>
-          <Select id="upload-musician" name="musicianId" required defaultValue="">
+          <Select
+            id="upload-musician"
+            name="musician_ref"
+            required
+            defaultValue=""
+          >
             <option value="" disabled>
               選択してください
             </option>
@@ -190,7 +229,7 @@ export function StandingAssetUploadForm({
           <Label htmlFor="upload-access-note">アクセスに関する注記</Label>
           <Input
             id="upload-access-note"
-            name="accessNote"
+            name="access_note"
             maxLength={300}
             placeholder="例: 使用前にDiscordで一声かけてください"
           />
@@ -201,13 +240,13 @@ export function StandingAssetUploadForm({
         <legend className="px-1 text-xs font-medium text-muted">
           利用許可の設定
         </legend>
-        <CheckRow name="allowCreditUse" label="クレジットでの使用を許可" defaultChecked />
-        <CheckRow name="allowThumbnailUse" label="サムネイルでの使用を許可" defaultChecked />
-        <CheckRow name="allowCropping" label="トリミングを許可" defaultChecked />
-        <CheckRow name="allowColorAdjustment" label="色調整を許可" />
+        <CheckRow name="allow_credit_use" label="クレジットでの使用を許可" defaultChecked />
+        <CheckRow name="allow_thumbnail_use" label="サムネイルでの使用を許可" defaultChecked />
+        <CheckRow name="allow_cropping" label="トリミングを許可" defaultChecked />
+        <CheckRow name="allow_color_adjustment" label="色調整を許可" />
         <label className="flex cursor-pointer items-center gap-2">
           <Checkbox
-            name="requireCredit"
+            name="require_credit"
             checked={requireCredit}
             onChange={(e) => setRequireCredit(e.target.checked)}
           />
@@ -218,13 +257,13 @@ export function StandingAssetUploadForm({
             <Label htmlFor="upload-credit-text">クレジット表記テキスト</Label>
             <Input
               id="upload-credit-text"
-              name="creditText"
+              name="credit_text"
               maxLength={200}
               placeholder="例: Illustration: ○○"
             />
           </div>
         ) : (
-          <input type="hidden" name="creditText" value="" />
+          <input type="hidden" name="credit_text" value="" />
         )}
       </fieldset>
 
@@ -232,16 +271,31 @@ export function StandingAssetUploadForm({
         <Label htmlFor="upload-usage-terms">利用条件（自由記述）</Label>
         <Textarea
           id="upload-usage-terms"
-          name="usageTerms"
+          name="usage_terms"
           rows={3}
           maxLength={1000}
           placeholder="例: EMN Records関連イベントの告知にのみ使用可。再配布禁止。"
         />
       </div>
 
+      <div className="flex flex-col gap-1">
+        <Label htmlFor="upload-password">アップロード用パスワード *</Label>
+        <Input
+          id="upload-password"
+          name="password"
+          type="password"
+          required
+          autoComplete="off"
+          placeholder="Discordで共有されているアップロード用パスワード"
+        />
+        <p className="text-[11px] text-muted">
+          パスワードはWordPressサーバー側で照合されます（このページを開く際の
+          パスワードと同じものです）。
+        </p>
+      </div>
+
       <label className="flex cursor-pointer items-start gap-2 rounded-md border border-line bg-surface p-3">
         <Checkbox
-          name="consent"
           checked={consented}
           onChange={(e) => setConsented(e.target.checked)}
           className="mt-0.5"
@@ -261,13 +315,13 @@ export function StandingAssetUploadForm({
             </p>
             {result.simulated ? (
               <p className="mt-1 text-[11px] text-amber-700">
-                （開発モード: WordPress未設定のため、実ファイルは保存されて
-                いません）
+                （開発モード: WordPress endpoint未設定のため、実ファイルは
+                保存されていません）
               </p>
             ) : null}
-            {result.fileUrl ? (
+            {result.file_url ? (
               <p className="mt-1 break-all text-[11px] text-muted">
-                {result.fileUrl}
+                {result.file_url}
               </p>
             ) : null}
             {(result.warnings ?? []).map((warning) => (
@@ -283,15 +337,22 @@ export function StandingAssetUploadForm({
         )
       ) : null}
 
-      <Button
-        type="submit"
-        variant="solid"
-        disabled={submitting || !file || !consented}
-        className="w-fit"
-      >
-        <Upload className="size-3.5" />
-        {submitting ? "アップロード中…" : "アップロード"}
-      </Button>
+      <div className="flex flex-col gap-2">
+        <Button
+          type="submit"
+          variant="solid"
+          disabled={submitting || !file || !consented}
+          className="w-fit"
+        >
+          <Upload className="size-3.5" />
+          {submitting ? "アップロード中…" : "アップロード"}
+        </Button>
+        <p className="text-[11px] text-muted">
+          {usingFallback
+            ? "WordPress endpoint未設定のため、開発用ローカルAPI（シミュレーション）へ送信します。"
+            : "ファイルはWordPress（ConoHa）へ直接アップロードされます。Vercelを経由しません。"}
+        </p>
+      </div>
     </form>
   );
 }

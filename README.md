@@ -16,8 +16,8 @@ EMN Records公式のミュージシャン名鑑・クレジット生成・立ち
 
 - Next.js (App Router) + TypeScript + Tailwind CSS
 - Supabase PostgreSQL（未設定時はmockデータで全画面動作）
-- WordPress REST API + ConoHa WING上のWordPress uploads（立ち絵ファイル置き場）
-- Vercel deploy想定
+- WordPress custom plugin（`wordpress-plugin/emn-musicians-assets`）+ ConoHa WING上のWordPress uploads（立ち絵の受け口・置き場）
+- Vercel deploy想定（**Vercelは20MBアップロードを受けない**。名鑑UI・クレジット生成UI・ダウンロードUIのみ担当）
 
 ## ローカル起動
 
@@ -57,20 +57,20 @@ npm run dev
 | `NEXT_PUBLIC_APP_URL` | 公開URL。本番は `https://musicians.emnrecords.com` |
 | `NEXT_PUBLIC_SUPABASE_URL` | SupabaseプロジェクトURL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key（`NEXT_PUBLIC_SUPABASE_ANON_KEY`でも可） |
+| `NEXT_PUBLIC_WORDPRESS_ASSET_UPLOAD_ENDPOINT` | 立ち絵アップロード先のWordPress custom endpoint URL（例: `https://emnrecords.com/wp-json/emn-musicians/v1/standing-assets/upload`）。URL自体は公開情報 |
 
 ### Server-only（絶対に `NEXT_PUBLIC` を付けない）
 
 | 変数 | 内容 |
 | --- | --- |
-| `SUPABASE_SECRET_KEY` | Supabase secret (service_role) key。members_only素材の取得とmetadata保存に必要 |
-| `WORDPRESS_BASE_URL` | WordPressサイトURL（例: `https://emnrecords.com`） |
-| `WORDPRESS_UPLOAD_USERNAME` | アップロード専用WordPressユーザー名 |
-| `WORDPRESS_APPLICATION_PASSWORD` | 上記ユーザーのApplication Password |
+| `SUPABASE_SECRET_KEY` | Supabase secret (service_role) key。members_only素材の取得に必要 |
 | `MEMBER_DOWNLOAD_PASSWORD_HASH` | ダウンロードページ共通パスワードのsha256 hexハッシュ（推奨） |
 | `MEMBER_DOWNLOAD_PASSWORD` | 同・平文（v0.1の暫定。本番はhashへ移行すること） |
-| `ASSET_UPLOAD_PASSWORD_HASH` | アップロードページパスワードのハッシュ。**download用と必ず別にする** |
+| `ASSET_UPLOAD_PASSWORD_HASH` | アップロードページパスワードのハッシュ。**download用と必ず別にする**。WordPress側の `EMN_MUSICIANS_UPLOAD_PASSWORD_HASH` と同じ値を設定する |
 | `ASSET_UPLOAD_PASSWORD` | 同・平文（暫定） |
 | `ACCESS_TOKEN_SECRET` | 任意。アクセスcookie署名用（未設定時はパスワードから導出） |
+
+legacy: 旧構成で使っていた `WORDPRESS_BASE_URL` / `WORDPRESS_UPLOAD_USERNAME` / `WORDPRESS_APPLICATION_PASSWORD` は**不要**になった。Next.js側にWordPress Application Passwordを持たせない（発行済みのものがあればrevokeしてよい）。
 
 パスワードハッシュの生成:
 
@@ -100,33 +100,63 @@ node -e "console.log(require('crypto').createHash('sha256').update('ここにパ
 - members_only素材・書き込みは、パスワード認証済みのserver routeがsecret key（service_role、RLSバイパス）経由でのみ実行
 - `credit_format_templates` はpublicなら誰でもselect可、本人管理はSupabase Auth導入後（v0.2）
 
-## WordPress REST API upload setup
+## Standing assets upload方針（WordPress custom endpoint）
 
 立ち絵はSupabase Storageではなく**ConoHa WING上のWordPress uploads**に保存する。理由: ConoHaの容量が余っており、Supabase Freeは20MB級ファイルにはすぐ上限が来る。立ち絵はWeb表示でなくダウンロード用途のため、WordPressのMedia Libraryで十分。
 
-### 専用ユーザーの作成（ユーザー作業）
-
-1. WordPress管理画面 → ユーザー → 新規追加
-2. 権限グループは **Author（投稿者）相当**にする（`upload_files`権限があれば足りる。Administratorは使わない）
-3. そのユーザーでログイン → プロフィール → Application Passwords → 名前（例: `musicians-app`）を入れて発行
-4. 表示されたパスワードを `WORDPRESS_APPLICATION_PASSWORD` に設定（**この画面でしか表示されない**）
-
-漏洩時のrevoke: 該当ユーザーのプロフィール → Application Passwords → 当該パスワードをRevoke → 新規発行してVercelの環境変数を更新。
+さらに、**20MB級のアップロードはVercelを経由しない**。Vercel serverless functionのrequest body上限（約4.5MB）があるため、アップロードの受け口はConoHa上のWordPressに寄せている。
 
 ### アップロードの流れ
 
 ```text
-ブラウザ → Next.js API route (/api/upload-standing-asset)
-  → WordPress REST API (/wp/v2/media) → ConoHa上のuploads
-  → Supabase standing_assets へmetadata保存
+ブラウザ（upload form）
+  → WordPress custom endpoint
+    POST /wp-json/emn-musicians/v1/standing-assets/upload
+  → WordPress Media Library / uploads（ConoHa）
+  → WordPressサーバーからSupabase standing_assets へmetadata保存
 ```
 
-- Application Passwordはserver-side環境変数のみ。client bundleには絶対に入れない
+- 認証はDiscordで共有する**アップロード用共通パスワード**（formで送信し、WordPress側でsha256ハッシュと`hash_equals`照合）。管理者パスワードやApplication Passwordではなく、漏洩時は定数変更でローテーションできる
+- 許可形式: PNG / JPEG / WebP のみ、最大20MB、1人あたり最大5件
+- MIME type・拡張子に加えて**magic number**（PNG: `89 50 4E 47...` / JPEG: `FF D8 FF` / WebP: `RIFF....WEBP`）を検証し、SVG / HTML / ZIP / PDF / PSD / CLIP / 不明形式はreject
 - ファイル名はユーザー入力を使わず、server側で `slug-日時-乱数.拡張子` に置換
-- 許可形式: PNG / JPEG / WebP のみ（最大20MB、1人あたり最大5件）。SVG / zip / pdf / psd / clip / 不明な形式はserver側でreject
-- 開発中（WordPress未設定時）はアップロードをシミュレートする
+- 原本をそのまま保存する（`-scaled`コピーや中間サイズは生成しない）
+- **Supabaseへのmetadata保存に失敗した場合は `wp_delete_attachment()` でファイルを削除**し、孤児ファイルを残さない
+- Supabase secret keyはWordPressサーバー側（wp-config.php）にのみ置く。ブラウザ・Next.js clientには出さない
+- Next.js側の旧route `/api/upload-standing-asset` は**開発用シミュレーションfallback**（本番では410を返す）。`NEXT_PUBLIC_WORDPRESS_ASSET_UPLOAD_ENDPOINT` 未設定時のみformがこちらへ送信する
 
-> **Vercelの制約**: Vercel serverless functionのrequest body上限は約4.5MBのため、Vercel上では20MB級のアップロードは通らない。v0.1では「大きいファイルはローカル起動でアップロードする」か「4MB以下に抑える」運用とし、恒久対応（直接アップロード方式など）はv0.2のTODO。
+### WordPress pluginの設置（ユーザー作業）
+
+1. `wordpress-plugin/emn-musicians-assets/` ディレクトリを、WordPressの `wp-content/plugins/` へアップロード（ConoHaのファイルマネージャーまたはFTP）
+2. `wp-config.php` に以下の定数を追加（**実値はGitHubにcommitしない**）:
+
+   ```php
+   define('EMN_MUSICIANS_UPLOAD_PASSWORD_HASH', '<アップロード用パスワードのsha256 hex>');
+   define('EMN_MUSICIANS_SUPABASE_URL', 'https://xxxx.supabase.co');
+   define('EMN_MUSICIANS_SUPABASE_SECRET_KEY', '<Supabase secret (service_role) key>');
+   // 任意（デフォルト: 下記2origin / 20MB / 5件）
+   // define('EMN_MUSICIANS_ALLOWED_ORIGINS', 'https://musicians.emnrecords.com,http://localhost:3000');
+   // define('EMN_MUSICIANS_MAX_FILE_BYTES', 20971520);
+   // define('EMN_MUSICIANS_MAX_ASSETS_PER_MUSICIAN', 5);
+   ```
+
+3. WordPress管理画面 → プラグイン → 「EMN Musicians Assets」を有効化
+4. PHPのアップロード上限を確認する（ConoHa WINGコントロールパネル → PHP設定）: `upload_max_filesize` と `post_max_size` を**25M以上**にする（20MBファイル+フォームデータ分の余裕）
+5. Vercel側の `NEXT_PUBLIC_WORDPRESS_ASSET_UPLOAD_ENDPOINT` に `https://emnrecords.com/wp-json/emn-musicians/v1/standing-assets/upload` を設定
+6. Next.js側 `ASSET_UPLOAD_PASSWORD_HASH` にWordPressと同じハッシュを設定（ページのゲートとendpoint照合で同じパスワードを使うため）
+
+パスワードローテーション: 新しいパスワードのハッシュを生成し、`EMN_MUSICIANS_UPLOAD_PASSWORD_HASH`（wp-config.php）と `ASSET_UPLOAD_PASSWORD_HASH`（Vercel）を両方更新し、Discordの掲示を差し替える。
+
+### CORS
+
+WordPress endpointは以下のoriginのみ許可する（ワイルドカード`*`は使わない）。OPTIONS preflightにも応答する。
+
+- `https://musicians.emnrecords.com`
+- `http://localhost:3000`
+
+変更する場合は `EMN_MUSICIANS_ALLOWED_ORIGINS`（カンマ区切り）で上書きする。
+
+トラブルシューティング: セキュリティ系プラグインがREST APIを制限している場合、`emn-musicians/v1` namespaceを許可すること。
 
 ## Standing assets download方針
 
@@ -190,11 +220,14 @@ musicians.emnrecords.com  CNAME  cname.vercel-dns.com
 
 ## セキュリティ上の制約まとめ
 
-- WordPress Application Password / 各種パスワードはserver-only環境変数。`NEXT_PUBLIC`を付けない。GitHubにcommitしない
+- 各種パスワードハッシュ・Supabase secretはserver-only（Vercel環境変数 / wp-config.php）。`NEXT_PUBLIC`を付けない。GitHubにcommitしない
+- **WordPress Application PasswordはNext.js側に持たない**（新構成では不要）
 - download用とupload用のパスワードは別
-- パスワード照合はserver側（sha256 + timing-safe比較）。成功時はhttpOnly署名cookie（12時間）
-- パスワード試行は簡易rate limit（インスタンス内メモリ、10分10回）
-- アップロードはserver側でMIME / 拡張子 / サイズを許可リスト検証
+- パスワード照合はserver側（sha256 + timing-safe比較）。Next.js側は成功時にhttpOnly署名cookie（12時間）、WordPress側は都度照合
+- パスワード試行は簡易rate limit（10分10回。Next.js側はインスタンス内メモリ、WordPress側はtransient）
+- アップロードはWordPress server側でMIME / 拡張子 / magic number / サイズを許可リスト検証
+- WordPress endpointのCORSは許可origin限定（ワイルドカード不使用）
+- Supabase metadata保存失敗時はWordPress attachmentを削除（孤児ファイルを残さない）
 - members_only素材のfile_urlは公開ページに出さない。ただし上記の通りURL漏洩時は直接アクセス可能
 - `/member/*` `/admin` `/credit-builder` はnoindex + robots.txtでdisallow
 - Custom Formatは正規表現による文字列置換のみ
@@ -220,7 +253,6 @@ npx tsx scripts/import-office-people.ts   # dry-run変換
 - Supabase Auth導入（本人編集・承認フロー、templateの本人管理）
 - credit_exports / credit_format_templates のDB保存UI
 - import script の実DB insert
-- 大容量アップロードのVercel対応（直接アップロード方式 or 別経路）
 - 素材の非公開配信（signed URL等）の検討
 - アイコン画像のカスタムアップロード（Supabase Storage / 正方形警告）
 - 管理画面でのデータ管理（v0.1はSQL/dashboard運用）
@@ -232,5 +264,6 @@ npx tsx scripts/import-office-people.ts   # dry-run変換
 - 本番DNS変更（ConoHa側CNAME追加）
 - Vercelプロジェクト作成と本番環境変数の実値設定
 - Supabase secret key / DB passwordの入力、SQL実行
-- WordPress専用ユーザー作成とApplication Password発行
+- WordPress pluginの設置・有効化と `wp-config.php` への定数追加（EMN_MUSICIANS_*）
+- ConoHaのPHPアップロード上限確認（upload_max_filesize / post_max_size ≥ 25M）
 - Discordチャンネルへのページ URL・共通パスワードの掲示
