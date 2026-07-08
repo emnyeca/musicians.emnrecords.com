@@ -142,10 +142,11 @@ node -e "console.log(require('crypto').createHash('sha256').update('ここにパ
    // define('EMN_MUSICIANS_MAX_ASSETS_PER_MUSICIAN', 5);
    ```
 
-3. WordPress管理画面 → プラグイン → 「EMN Musicians Assets」を有効化
+3. WordPress管理画面 → プラグイン → 「EMN Musicians Assets」を有効化。定数が未設定の場合、管理画面上部に**設定不足の警告（admin notice）**が表示される（実値は表示しない。不足している定数名のみ）
 4. PHPのアップロード上限を確認する（ConoHa WINGコントロールパネル → PHP設定）: `upload_max_filesize` と `post_max_size` を**25M以上**にする（20MBファイル+フォームデータ分の余裕）
-5. Vercel側の `NEXT_PUBLIC_WORDPRESS_ASSET_UPLOAD_ENDPOINT` に `https://emnrecords.com/wp-json/emn-musicians/v1/standing-assets/upload` を設定
-6. Next.js側 `ASSET_UPLOAD_PASSWORD_HASH` にWordPressと同じハッシュを設定（ページのゲートとendpoint照合で同じパスワードを使うため）
+5. **下記「WordPress REST API疎通確認」の手順1〜3で疎通確認する**（`/wp-json/` → `/health` → `upload` の順）
+6. Vercel側の `NEXT_PUBLIC_WORDPRESS_ASSET_UPLOAD_ENDPOINT` に `https://emnrecords.com/wp-json/emn-musicians/v1/standing-assets/upload` を設定
+7. Next.js側 `ASSET_UPLOAD_PASSWORD_HASH` にWordPressと同じハッシュを設定（ページのゲートとendpoint照合で同じパスワードを使うため）
 
 パスワードローテーション: 新しいパスワードのハッシュを生成し、`EMN_MUSICIANS_UPLOAD_PASSWORD_HASH`（wp-config.php）と `ASSET_UPLOAD_PASSWORD_HASH`（Vercel）を両方更新し、Discordの掲示を差し替える。
 
@@ -159,6 +160,73 @@ WordPress endpointは以下のoriginのみ許可する（ワイルドカード`*
 変更する場合は `EMN_MUSICIANS_ALLOWED_ORIGINS`（カンマ区切り）で上書きする。
 
 トラブルシューティング: セキュリティ系プラグインがREST APIを制限している場合、`emn-musicians/v1` namespaceを許可すること。
+
+### WordPress REST API疎通確認
+
+pluginの設置後は、必ず**下から順に**疎通確認する。上位（WordPress REST APIそのもの）が失敗している場合、pluginのroute個別の設定を疑っても解決しない。
+
+1. **`/wp-json/` が開くか**（WordPress REST APIのroot）
+
+   ```powershell
+   Invoke-WebRequest -Uri "https://emnrecords.com/wp-json/" -Method GET | Select-Object -ExpandProperty Content
+   ```
+
+   ここが**404になる場合、原因はplugin側ではなくWordPress REST API / rewrite / hosting側**。下記「`/wp-json/` が404になる場合の原因候補」へ進む。JSON（サイト名やnamespace一覧を含む）が返れば正常。
+
+2. **`/wp-json/emn-musicians/v1/health` が開くか**（plugin route + namespace確認。secretは返さない）
+
+   ```powershell
+   Invoke-WebRequest -Uri "https://emnrecords.com/wp-json/emn-musicians/v1/health" -Method GET | Select-Object -ExpandProperty Content
+   ```
+
+   `{"ok":true,"plugin":"emn-musicians-assets","version":"0.1.0"}` が返れば、pluginは正しく読み込まれ有効化されている。ここで404（かつ手順1は成功）の場合、plugin未有効化・ファイル配置ミス・route登録が読み込まれていない（パーマリンク再保存が必要な場合がある）を疑う。
+
+3. **`/wp-json/emn-musicians/v1/standing-assets/upload` はPOST専用**。ブラウザでGETすると405（Method Not Allowed）が正しい応答（404ではない）。疎通確認はPowerShell / curlでPOSTする:
+
+   ```powershell
+   Invoke-WebRequest `
+     -Uri "https://emnrecords.com/wp-json/emn-musicians/v1/standing-assets/upload" `
+     -Method POST `
+     -Body @{ password = "wrong-password-for-test" }
+   ```
+
+   `wp-config.php`の定数が設定済みなら `{"ok":false,"error":"Invalid upload password."}`（HTTP 401）が返れば正常（endpointへ到達し、パスワード検証まで動いている）。定数未設定なら503が返る。
+
+### `/wp-json/` が404になる場合の原因候補
+
+上の手順1が404の場合、考えられる原因（可能性が高い順）:
+
+1. **パーマリンク設定が「基本」（Plain）のまま、または再保存が実際には反映されていない** — WordPress管理画面 → 設定 → パーマリンク → 「基本」以外（例: 投稿名）を選び直して保存する。ConoHa WINGで `.htaccess` が書き込み不可の場合、保存操作が成功したように見えても実際にはrewrite ruleが更新されないことがある
+2. **セキュリティ系プラグイン（Wordfence / SiteGuard / All In One WP Security 等）がREST APIを無効化・制限している** — 該当プラグインの設定でREST API制限を一時的にOFFにして再確認する。SiteGuard WP PluginはXML-RPCやログインを保護する過程でREST APIにも影響することがあるので要確認
+3. **ConoHa WING側のWAF（コントロールパネルの「WAF設定」）が `/wp-json/` へのアクセスをブロックしている** — WAFログを確認し、必要なら `/wp-json/*` を除外ルールに追加する
+4. **テーマの `functions.php` または mu-plugin でREST APIを無効化するコードが入っている** — `remove_action('init', 'rest_api_init')` や `add_filter('rest_enabled', '__return_false')`、`add_filter('rest_authentication_errors', ...)` 等を検索する
+5. **キャッシュ・高速化プラグイン（WP Fastest Cache等）または静的化構成が `/wp-json/` を含む未知パスに対して独自の404ページを返している** — 該当プラグインの除外設定を確認する
+6. **`.htaccess` にWordPress標準のrewriteブロックが存在しない、または上書きされている** — 下記「`.htaccess` 確認項目」を参照
+7. WordPressアドレス/サイトアドレス（設定 → 一般）が実際のアクセスURLと異なる（例: `www` の有無、httpとhttpsの不一致）
+
+### `.htaccess` 確認項目
+
+ConoHa WINGのWordPressインストールディレクトリ直下の `.htaccess` に、以下のWordPress標準ブロックが**存在すること**を確認する（`# BEGIN WordPress` 〜 `# END WordPress` で囲まれた部分）:
+
+```apache
+# BEGIN WordPress
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteBase /
+RewriteRule ^index\.php$ - [L]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule . /index.php [L]
+</IfModule>
+# END WordPress
+```
+
+確認するポイント:
+
+- このブロック自体が**存在しない**場合 → パーマリンクを再保存する（WordPressが自動生成する）。それでも生成されない場合はファイルの書き込み権限を確認する
+- このブロックより**前に** `/wp-json` や `wp-json` を明示的にdenyする `RewriteRule` や `RewriteCond`、`<LocationMatch>` / `<Files>` ディレクティブがないか確認する（セキュリティプラグインが自動追加している場合がある）
+- ConoHa WING独自の追加設定（`Deny from all` 等）が `.htaccess` の他の箇所に無いか確認する
+- 変更前に必ず `.htaccess` のバックアップを取る
 
 ## Standing assets download方針
 
@@ -230,6 +298,7 @@ musicians.emnrecords.com  CNAME  cname.vercel-dns.com
 - アップロードはWordPress server側でMIME / 拡張子 / magic number / サイズを許可リスト検証
 - WordPress endpointのCORSは許可origin限定（ワイルドカード不使用）
 - Supabase metadata保存失敗時はWordPress attachmentを削除（孤児ファイルを残さない）
+- health endpoint（`GET /wp-json/emn-musicians/v1/health`）はpassword hash・Supabase URL・Supabase secret keyのいずれも返さない（`ok` / `plugin` / `version` のみ）
 - members_only素材のfile_urlは公開ページに出さない。ただし上記の通りURL漏洩時は直接アクセス可能
 - `/member/*` `/admin` `/credit-builder` はnoindex + robots.txtでdisallow
 - Custom Formatは正規表現による文字列置換のみ

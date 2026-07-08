@@ -29,6 +29,50 @@ type UploadResult = {
   warnings?: string[];
 };
 
+/** Shape of WordPress core's own REST error responses (not this plugin's). */
+type WordPressRestError = {
+  code?: string;
+  message?: string;
+};
+
+/**
+ * Turns a failed-to-parse-as-JSON response into a diagnosis.
+ *
+ * A 404 that isn't JSON usually means the request never reached WordPress's
+ * REST dispatcher at all (Apache/WAF/security-plugin serving its own 404
+ * page for /wp-json/*), which is a server/hosting problem, not a plugin bug.
+ */
+function describeNonJsonFailure(status: number): string {
+  if (status === 404) {
+    return (
+      "WordPress endpointが404です。WordPress REST APIのroot（/wp-json/）自体が" +
+      "無効になっている可能性があります。プラグインの問題ではなく、パーマリンク設定・" +
+      ".htaccess・セキュリティプラグイン・WAFを確認してください（README「WordPress " +
+      "REST API疎通確認」を参照）。"
+    );
+  }
+  return `サーバーから予期しない応答が返りました（HTTP ${status}）。WordPress側のエラーログを確認してください。`;
+}
+
+/**
+ * WordPress answered with valid JSON but not this plugin's { ok, ... }
+ * contract — typically its own "no matching route" error, meaning REST API
+ * itself works but the plugin's route isn't registered (not active /
+ * namespace blocked / needs a permalink resave).
+ */
+function describeWordPressRestError(wpError: WordPressRestError): string {
+  if (wpError.code === "rest_no_route") {
+    return (
+      "WordPress REST APIには到達していますが、endpoint " +
+      "（emn-musicians/v1/standing-assets/upload）が見つかりません。" +
+      "プラグインが有効化されていないか、route登録が読み込まれていない可能性があります" +
+      "（README「WordPress REST API疎通確認」を参照。/wp-json/emn-musicians/v1/health " +
+      "が開けるか確認してください）。"
+    );
+  }
+  return wpError.message ?? "WordPressから予期しないエラー応答がありました。";
+}
+
 /**
  * Standing asset upload form.
  *
@@ -126,14 +170,19 @@ export function StandingAssetUploadForm({
 
     try {
       const response = await fetch(endpoint, { method: "POST", body: data });
+      const rawText = await response.text();
       let body: UploadResult;
       try {
-        body = (await response.json()) as UploadResult;
+        const parsed = JSON.parse(rawText) as UploadResult | WordPressRestError;
+        body =
+          typeof (parsed as UploadResult).ok === "boolean"
+            ? (parsed as UploadResult)
+            : {
+                ok: false,
+                error: describeWordPressRestError(parsed as WordPressRestError),
+              };
       } catch {
-        body = {
-          ok: false,
-          error: `サーバーから不正な応答が返りました（HTTP ${response.status}）。`,
-        };
+        body = { ok: false, error: describeNonJsonFailure(response.status) };
       }
       setResult(body);
       if (body.ok) {
@@ -146,7 +195,8 @@ export function StandingAssetUploadForm({
       setResult({
         ok: false,
         error:
-          "通信に失敗しました。WordPress endpointの設定（CORS含む）を確認してください。",
+          "通信に失敗しました（ネットワークエラーまたはCORS）。WordPress endpointの" +
+          "URLとCORS設定（許可origin）を確認してください。",
       });
     } finally {
       setSubmitting(false);

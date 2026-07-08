@@ -15,8 +15,13 @@
  *   define('EMN_MUSICIANS_MAX_FILE_BYTES', 20971520);          // default 20MB
  *   define('EMN_MUSICIANS_MAX_ASSETS_PER_MUSICIAN', 5);        // default 5
  *
- * Endpoint:
+ * Endpoints:
  *   POST /wp-json/emn-musicians/v1/standing-assets/upload
+ *   GET  /wp-json/emn-musicians/v1/health   (no secrets; connectivity check)
+ *
+ * Connectivity troubleshooting: if GET /wp-json/ itself returns 404, that is
+ * a WordPress REST API / rewrite / hosting problem, NOT a plugin problem —
+ * see the "WordPress REST API疎通確認" section in the app's README.
  *
  * Security model:
  * - Auth is a shared operational upload password (posted as a form field and
@@ -33,6 +38,7 @@ if (!defined('ABSPATH')) {
 }
 
 define('EMN_MUSICIANS_REST_NS', 'emn-musicians/v1');
+define('EMN_MUSICIANS_VERSION', '0.1.0');
 
 function emn_musicians_max_file_bytes() {
     return defined('EMN_MUSICIANS_MAX_FILE_BYTES')
@@ -86,10 +92,59 @@ function emn_musicians_register_routes() {
         // Auth is the shared upload password, verified inside the handler.
         'permission_callback' => '__return_true',
     ));
+
+    // Unauthenticated, no secrets: lets the Next.js app (and admins running
+    // curl/Invoke-WebRequest) tell "WordPress REST API is unreachable" apart
+    // from "this plugin's route isn't registered" while diagnosing 404s.
+    register_rest_route(EMN_MUSICIANS_REST_NS, '/health', array(
+        'methods'  => 'GET',
+        'callback' => 'emn_musicians_handle_health',
+        'permission_callback' => '__return_true',
+    ));
+}
+
+function emn_musicians_handle_health(WP_REST_Request $request) {
+    return new WP_REST_Response(array(
+        'ok'      => true,
+        'plugin'  => 'emn-musicians-assets',
+        'version' => EMN_MUSICIANS_VERSION,
+    ), 200);
 }
 
 function emn_musicians_error($message, $status) {
     return new WP_REST_Response(array('ok' => false, 'error' => $message), $status);
+}
+
+/**
+ * Admin-only notice listing which required wp-config.php constants are
+ * missing. Never prints their values — presence/absence only.
+ */
+add_action('admin_notices', 'emn_musicians_admin_notices');
+function emn_musicians_admin_notices() {
+    if (!current_user_can('manage_options')) {
+        return;
+    }
+
+    $missing = array();
+    if (!defined('EMN_MUSICIANS_UPLOAD_PASSWORD_HASH') || EMN_MUSICIANS_UPLOAD_PASSWORD_HASH === '') {
+        $missing[] = 'EMN_MUSICIANS_UPLOAD_PASSWORD_HASH';
+    }
+    if (!defined('EMN_MUSICIANS_SUPABASE_URL') || EMN_MUSICIANS_SUPABASE_URL === '') {
+        $missing[] = 'EMN_MUSICIANS_SUPABASE_URL';
+    }
+    if (!defined('EMN_MUSICIANS_SUPABASE_SECRET_KEY') || EMN_MUSICIANS_SUPABASE_SECRET_KEY === '') {
+        $missing[] = 'EMN_MUSICIANS_SUPABASE_SECRET_KEY';
+    }
+    if (empty($missing)) {
+        return;
+    }
+
+    printf(
+        '<div class="notice notice-warning"><p><strong>EMN Musicians Assets:</strong> %s<br><code>%s</code></p><p>%s</p></div>',
+        esc_html__('The following wp-config.php constants are not set. The upload endpoint will respond 503 until they are defined (values are never shown here):', 'emn-musicians-assets'),
+        esc_html(implode(', ', $missing)),
+        esc_html__('See the plugin file header, or the app README "WordPress pluginの設置" section, for the constants to add.', 'emn-musicians-assets')
+    );
 }
 
 /**
