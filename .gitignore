@@ -40,3 +40,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# WordPress plugin upload package (generated locally for the WP plugin
+# uploader; source of truth is the .php file, not the zip)
+wordpress-plugin/**/*.zip
