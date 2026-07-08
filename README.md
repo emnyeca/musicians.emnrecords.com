@@ -196,13 +196,14 @@ pluginの設置後は、必ず**下から順に**疎通確認する。上位（W
 
 上の手順1が404の場合、考えられる原因（可能性が高い順）:
 
-1. **パーマリンク設定が「基本」（Plain）のまま、または再保存が実際には反映されていない** — WordPress管理画面 → 設定 → パーマリンク → 「基本」以外（例: 投稿名）を選び直して保存する。ConoHa WINGで `.htaccess` が書き込み不可の場合、保存操作が成功したように見えても実際にはrewrite ruleが更新されないことがある
-2. **セキュリティ系プラグイン（Wordfence / SiteGuard / All In One WP Security 等）がREST APIを無効化・制限している** — 該当プラグインの設定でREST API制限を一時的にOFFにして再確認する。SiteGuard WP PluginはXML-RPCやログインを保護する過程でREST APIにも影響することがあるので要確認
+1. **パーマリンク設定が「基本」（Plain）のまま、または再保存が実際には反映されていない** — 最有力候補。**確定診断方法**: `.htaccess`の `# BEGIN WordPress` 〜 `# END WordPress` の間を見る。ここに `RewriteEngine On` や `RewriteRule` が1行もなく空（コメントのみ）の場合、パーマリンクが「基本」のままである確実な兆候（WordPressコアは「基本」の場合、rewriteルールを意図的に空文字列で書き込むため）。「基本」パーマリンクは実在するPHPファイルへの直接アクセスのみでrewrite不要だが、`/wp-json/`は実在するファイル/ディレクトリではないため、catch-all rewriteが無いとApache側で（WordPressのコードが動く前に）404になる。修正: WordPress管理画面 → 設定 → パーマリンク → 「基本」以外（例: 投稿名）を選び直して保存し、`.htaccess`に実際のrewriteルールが書き込まれたか確認する。書き込まれない場合は`.htaccess`が書き込み不可なので、ConoHaのファイルマネージャー/FTPで手動追記する
+2. **セキュリティ系プラグイン（Wordfence / SiteGuard / All In One WP Security 等）がREST APIを無効化・制限している** — 該当プラグインの設定でREST API制限を一時的にOFFにして再確認する。SiteGuard WP PluginはXML-RPCやログインを保護する過程でREST APIにも影響することがあるので要確認（`.htaccess`に`#SITEGUARD_PLUGIN_SETTINGS_START`〜`END`のマーカーがあり中身が空なのは、対応機能が未使用なら正常。上記1を先に解消してから疑う）
 3. **ConoHa WING側のWAF（コントロールパネルの「WAF設定」）が `/wp-json/` へのアクセスをブロックしている** — WAFログを確認し、必要なら `/wp-json/*` を除外ルールに追加する
 4. **テーマの `functions.php` または mu-plugin でREST APIを無効化するコードが入っている** — `remove_action('init', 'rest_api_init')` や `add_filter('rest_enabled', '__return_false')`、`add_filter('rest_authentication_errors', ...)` 等を検索する
 5. **キャッシュ・高速化プラグイン（WP Fastest Cache等）または静的化構成が `/wp-json/` を含む未知パスに対して独自の404ページを返している** — 該当プラグインの除外設定を確認する
-6. **`.htaccess` にWordPress標準のrewriteブロックが存在しない、または上書きされている** — 下記「`.htaccess` 確認項目」を参照
-7. WordPressアドレス/サイトアドレス（設定 → 一般）が実際のアクセスURLと異なる（例: `www` の有無、httpとhttpsの不一致）
+6. WordPressアドレス/サイトアドレス（設定 → 一般）が実際のアクセスURLと異なる（例: `www` の有無、httpとhttpsの不一致）
+
+上記1で `.htaccess` にrewriteルールが正しく書き込まれているにもかかわらず404が続く場合は、下記「`.htaccess` 確認項目」でセキュリティ系プラグインによる上書き・追加denyルールの有無を確認する。
 
 ### `.htaccess` 確認項目
 
