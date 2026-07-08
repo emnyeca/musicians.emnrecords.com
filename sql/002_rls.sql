@@ -3,9 +3,11 @@
 --
 -- v0.1 model (no Supabase Auth yet):
 -- * Anonymous (publishable/anon key): read public data only.
--- * The app server uses the secret (service_role) key for gated member pages
---   and uploads — service_role bypasses RLS, so members_only assets and all
---   writes happen only through password-gated server routes.
+-- * members_only asset READS: the password-gated Next.js server routes use
+--   the secret (service_role) key, which bypasses RLS.
+-- * standing_assets WRITES: the WordPress custom upload endpoint
+--   (wordpress-plugin/emn-musicians-assets) inserts with the Supabase secret
+--   key kept on the WordPress server. Browsers never write directly.
 -- * v0.2+: replace the "authenticated" template policies below with real
 --   per-user ownership once Supabase Auth is introduced.
 

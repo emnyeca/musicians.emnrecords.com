@@ -97,7 +97,9 @@ node -e "console.log(require('crypto').createHash('sha256').update('ここにパ
 ### RLS方針
 
 - 匿名（publishable key）: public musicians / public links / public+activeな standing_assets のみselect可
-- members_only素材・書き込みは、パスワード認証済みのserver routeがsecret key（service_role、RLSバイパス）経由でのみ実行
+- members_only素材の**読み取り**は、パスワード認証済みのNext.js server routeがservice role key（RLSバイパス）で取得する
+- standing_assetsへの**書き込み**は、WordPress custom endpointがWordPressサーバー側のSupabase secret keyで行う
+- ブラウザからstanding_assetsへ直接writeしない
 - `credit_format_templates` はpublicなら誰でもselect可、本人管理はSupabase Auth導入後（v0.2）
 
 ## Standing assets upload方針（WordPress custom endpoint）

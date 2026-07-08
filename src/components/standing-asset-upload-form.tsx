@@ -46,6 +46,13 @@ const WORDPRESS_UPLOAD_ENDPOINT =
 
 const LEGACY_DEV_FALLBACK_ENDPOINT = "/api/upload-standing-asset";
 
+/**
+ * The dev simulation fallback must never silently stand in for a missing
+ * production config — show an explicit admin-facing error instead.
+ */
+const MISSING_ENDPOINT_IN_PRODUCTION =
+  !WORDPRESS_UPLOAD_ENDPOINT && process.env.NODE_ENV === "production";
+
 export function StandingAssetUploadForm({
   musicians,
 }: {
@@ -87,7 +94,7 @@ export function StandingAssetUploadForm({
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!file || !consented) return;
+    if (!file || !consented || MISSING_ENDPOINT_IN_PRODUCTION) return;
     setSubmitting(true);
     setResult(null);
 
@@ -337,21 +344,33 @@ export function StandingAssetUploadForm({
         )
       ) : null}
 
+      {MISSING_ENDPOINT_IN_PRODUCTION ? (
+        <p className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+          WordPress upload endpoint is not configured.
+          （NEXT_PUBLIC_WORDPRESS_ASSET_UPLOAD_ENDPOINT が未設定のため、
+          アップロードできません。管理者はVercelの環境変数を確認してください）
+        </p>
+      ) : null}
+
       <div className="flex flex-col gap-2">
         <Button
           type="submit"
           variant="solid"
-          disabled={submitting || !file || !consented}
+          disabled={
+            submitting || !file || !consented || MISSING_ENDPOINT_IN_PRODUCTION
+          }
           className="w-fit"
         >
           <Upload className="size-3.5" />
           {submitting ? "アップロード中…" : "アップロード"}
         </Button>
-        <p className="text-[11px] text-muted">
-          {usingFallback
-            ? "WordPress endpoint未設定のため、開発用ローカルAPI（シミュレーション）へ送信します。"
-            : "ファイルはWordPress（ConoHa）へ直接アップロードされます。Vercelを経由しません。"}
-        </p>
+        {MISSING_ENDPOINT_IN_PRODUCTION ? null : (
+          <p className="text-[11px] text-muted">
+            {usingFallback
+              ? "WordPress endpoint未設定のため、開発用ローカルAPI（シミュレーション）へ送信します。"
+              : "ファイルはWordPress（ConoHa）へ直接アップロードされます。Vercelを経由しません。"}
+          </p>
+        )}
       </div>
     </form>
   );

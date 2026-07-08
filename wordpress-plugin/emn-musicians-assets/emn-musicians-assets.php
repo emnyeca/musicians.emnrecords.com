@@ -71,7 +71,7 @@ function emn_musicians_cors_headers($served, $result, $request, $server) {
     if ($origin && in_array($origin, emn_musicians_allowed_origins(), true)) {
         header('Access-Control-Allow-Origin: ' . $origin);
         header('Access-Control-Allow-Methods: POST, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type');
+        header('Access-Control-Allow-Headers: Content-Type, X-Requested-With');
         header('Access-Control-Max-Age: 600');
         header('Vary: Origin', false);
     }
@@ -90,6 +90,22 @@ function emn_musicians_register_routes() {
 
 function emn_musicians_error($message, $status) {
     return new WP_REST_Response(array('ok' => false, 'error' => $message), $status);
+}
+
+/**
+ * Media filters used around wp_handle_upload / attachment metadata so the
+ * original file is kept as-is (no "-scaled" copy, no intermediate sizes).
+ * Always pair emn_musicians_add_media_filters() with
+ * emn_musicians_remove_media_filters() on every exit path.
+ */
+function emn_musicians_add_media_filters() {
+    add_filter('big_image_size_threshold', '__return_false');
+    add_filter('intermediate_image_sizes_advanced', '__return_empty_array');
+}
+
+function emn_musicians_remove_media_filters() {
+    remove_filter('big_image_size_threshold', '__return_false');
+    remove_filter('intermediate_image_sizes_advanced', '__return_empty_array');
 }
 
 function emn_musicians_handle_upload(WP_REST_Request $request) {
@@ -199,9 +215,8 @@ function emn_musicians_handle_upload(WP_REST_Request $request) {
     // --- Store into the Media Library. ---
     // Standing assets are downloaded as-is: keep the original file, skip the
     // "-scaled" copy and intermediate sizes (also saves memory/disk for 20MB
-    // images on shared hosting).
-    add_filter('big_image_size_threshold', '__return_false');
-    add_filter('intermediate_image_sizes_advanced', '__return_empty_array');
+    // images on shared hosting). The filters are removed on every exit path.
+    emn_musicians_add_media_filters();
 
     require_once ABSPATH . 'wp-admin/includes/file.php';
     require_once ABSPATH . 'wp-admin/includes/image.php';
@@ -217,6 +232,7 @@ function emn_musicians_handle_upload(WP_REST_Request $request) {
         ),
     ));
     if (!is_array($moved) || isset($moved['error'])) {
+        emn_musicians_remove_media_filters();
         $detail = (is_array($moved) && isset($moved['error'])) ? $moved['error'] : 'unknown error';
         return emn_musicians_error('Could not store the file: ' . $detail, 500);
     }
@@ -231,6 +247,7 @@ function emn_musicians_handle_upload(WP_REST_Request $request) {
         $moved['file']
     );
     if (is_wp_error($attachment_id) || !$attachment_id) {
+        emn_musicians_remove_media_filters();
         @unlink($moved['file']);
         return emn_musicians_error('Could not register the attachment.', 500);
     }
@@ -238,8 +255,7 @@ function emn_musicians_handle_upload(WP_REST_Request $request) {
         $attachment_id,
         wp_generate_attachment_metadata($attachment_id, $moved['file'])
     );
-    remove_filter('big_image_size_threshold', '__return_false');
-    remove_filter('intermediate_image_sizes_advanced', '__return_empty_array');
+    emn_musicians_remove_media_filters();
 
     $file_url = wp_get_attachment_url($attachment_id);
     if (!$file_url) {
