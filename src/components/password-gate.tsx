@@ -15,10 +15,12 @@ export function PasswordGate({
   endpoint,
   title,
   description,
+  footer,
 }: {
   endpoint: string;
   title: string;
   description: string;
+  footer?: string;
 }) {
   const router = useRouter();
   const [password, setPassword] = useState("");
@@ -76,8 +78,8 @@ export function PasswordGate({
         </Button>
       </form>
       <p className="text-center text-[11px] leading-relaxed text-muted">
-        パスワードはEMN Recordsの確認済みメンバー向けDiscordチャンネルで
-        共有されています。
+        {footer ??
+          "パスワードはEMN Recordsの確認済みメンバー向けDiscordチャンネルで共有されています。"}
       </p>
     </div>
   );

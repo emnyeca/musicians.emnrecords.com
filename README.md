@@ -2,9 +2,9 @@
 
 EMN Records公式のミュージシャン名鑑・クレジット生成・立ち絵素材配布ツール。
 
-公開URL: `https://artists.emnrecords.com`（`NEXT_PUBLIC_APP_URL`で管理。ハードコードしない）
+公開URL: `https://musicians.emnrecords.com`（`NEXT_PUBLIC_APP_URL`で管理。ハードコードしない）
 
-※ リポジトリ名は `musicians.emnrecords.com` のままだが、公開URLは `artists` サブドメイン。当初の `musicians.emnrecords.com` はVercelのエッジ設定がプラットフォーム側の問題で壊れたホスト名として使用不能になったため、公開前に `artists` へ切り替えた（リポジトリ名は機能に影響しないため維持）。
+※ 一時的に `artists.emnrecords.com` を代替URLとして使っていたが、Vercel側のFramework設定をNext.jsへ修正したため、正式URLは `musicians.emnrecords.com` に戻す。
 
 ## 目的
 
@@ -34,6 +34,7 @@ npm run dev
 
 - ダウンロードページ（`/member/standing-assets`）: `member-dev`
 - アップロードページ（`/member/upload-standing-asset`）: `upload-dev`
+- 管理画面（`/admin`）: `admin-dev`
 
 本番（`NODE_ENV=production`）ではフォールバックは無効。環境変数の設定が必須。
 
@@ -46,7 +47,7 @@ npm run dev
 | `/credit-builder` | クレジット生成。一時編集・並び替え・7形式出力 |
 | `/member/standing-assets` | 立ち絵ダウンロード（共通パスワード、noindex） |
 | `/member/upload-standing-asset` | 立ち絵アップロード（別パスワード、noindex） |
-| `/admin` | v0.1では設定状況の確認のみ（noindex） |
+| `/admin` | 管理者パスワード保護。設定状況確認とミュージシャン追加（noindex） |
 
 ## 環境変数
 
@@ -56,7 +57,7 @@ npm run dev
 
 | 変数 | 内容 |
 | --- | --- |
-| `NEXT_PUBLIC_APP_URL` | 公開URL。本番は `https://artists.emnrecords.com` |
+| `NEXT_PUBLIC_APP_URL` | 公開URL。本番は `https://musicians.emnrecords.com` |
 | `NEXT_PUBLIC_SUPABASE_URL` | SupabaseプロジェクトURL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key（`NEXT_PUBLIC_SUPABASE_ANON_KEY`でも可） |
 | `NEXT_PUBLIC_WORDPRESS_ASSET_UPLOAD_ENDPOINT` | 立ち絵アップロード先のWordPress custom endpoint URL（例: `https://emnrecords.com/wp-json/emn-musicians/v1/standing-assets/upload`）。URL自体は公開情報 |
@@ -70,6 +71,8 @@ npm run dev
 | `MEMBER_DOWNLOAD_PASSWORD` | 同・平文（v0.1の暫定。本番はhashへ移行すること） |
 | `ASSET_UPLOAD_PASSWORD_HASH` | アップロードページパスワードのハッシュ。**download用と必ず別にする**。WordPress側の `EMN_MUSICIANS_UPLOAD_PASSWORD_HASH` と同じ値を設定する |
 | `ASSET_UPLOAD_PASSWORD` | 同・平文（暫定） |
+| `ADMIN_PASSWORD_HASH` | 管理画面用パスワードのsha256 hexハッシュ（推奨）。download/upload用とは必ず別にする |
+| `ADMIN_PASSWORD` | 同・平文（暫定） |
 | `ACCESS_TOKEN_SECRET` | 任意。アクセスcookie署名用（未設定時はパスワードから導出） |
 
 legacy: 旧構成で使っていた `WORDPRESS_BASE_URL` / `WORDPRESS_UPLOAD_USERNAME` / `WORDPRESS_APPLICATION_PASSWORD` は**不要**になった。Next.js側にWordPress Application Passwordを持たせない（発行済みのものがあればrevokeしてよい）。
@@ -138,8 +141,8 @@ node -e "console.log(require('crypto').createHash('sha256').update('ここにパ
    define('EMN_MUSICIANS_UPLOAD_PASSWORD_HASH', '<アップロード用パスワードのsha256 hex>');
    define('EMN_MUSICIANS_SUPABASE_URL', 'https://xxxx.supabase.co');
    define('EMN_MUSICIANS_SUPABASE_SECRET_KEY', '<Supabase secret (service_role) key>');
-   // 任意（デフォルト: 下記2origin / 20MB / 5件）
-   // define('EMN_MUSICIANS_ALLOWED_ORIGINS', 'https://artists.emnrecords.com,http://localhost:3000');
+   // 任意（デフォルト: 下記3origin / 20MB / 5件）
+   // define('EMN_MUSICIANS_ALLOWED_ORIGINS', 'https://musicians.emnrecords.com,https://artists.emnrecords.com,http://localhost:3000');
    // define('EMN_MUSICIANS_MAX_FILE_BYTES', 20971520);
    // define('EMN_MUSICIANS_MAX_ASSETS_PER_MUSICIAN', 5);
    ```
@@ -156,6 +159,7 @@ node -e "console.log(require('crypto').createHash('sha256').update('ここにパ
 
 WordPress endpointは以下のoriginのみ許可する（ワイルドカード`*`は使わない）。OPTIONS preflightにも応答する。
 
+- `https://musicians.emnrecords.com`
 - `https://artists.emnrecords.com`
 - `http://localhost:3000`
 
@@ -274,29 +278,29 @@ npx tsx scripts/import-office-people.ts ../office/knowledge/wordpress/credits/pe
 
 1. Vercelで本リポジトリをimport（Framework: Next.js、設定はデフォルトでよい）
 2. 環境変数を設定（上記の表を参照。Production/Preview両方）
-3. Settings → Domains に `artists.emnrecords.com` を追加
+3. Settings → Domains に `musicians.emnrecords.com` を追加
 
 ### DNS設定（ConoHa側・ユーザー作業）
 
 ConoHa WINGのDNS設定で、サブドメイン `musicians` のCNAMEレコードを追加:
 
 ```text
-artists.emnrecords.com  CNAME  cname.vercel-dns.com
+musicians.emnrecords.com  CNAME  f5202c022cf44483.vercel-dns-017.com.
 ```
 
 （Vercelのドメイン追加画面に表示される値を正とする。`emnrecords.com`本体のWordPress運用には影響しない）
 
 ### URL方針
 
-- v0.1: サブドメイン `artists.emnrecords.com`
+- v0.1: サブドメイン `musicians.emnrecords.com`
 - 将来候補: `emnrecords.com/musicians`（basePath移行を想定し、URLは全て`NEXT_PUBLIC_APP_URL`基準で生成している）
-- `musicians.emnrecords.com` は使用不能（Vercelエッジ設定の破損がプラットフォーム側に残存）。将来復旧が確認できたら、`artists` への301リダイレクト用として再追加してもよい
+- `artists.emnrecords.com` は復旧作業中の代替URLとして残してよいが、正本URLにはしない
 
 ## セキュリティ上の制約まとめ
 
 - 各種パスワードハッシュ・Supabase secretはserver-only（Vercel環境変数 / wp-config.php）。`NEXT_PUBLIC`を付けない。GitHubにcommitしない
 - **WordPress Application PasswordはNext.js側に持たない**（新構成では不要）
-- download用とupload用のパスワードは別
+- download用・upload用・admin用のパスワードは別
 - パスワード照合はserver側（sha256 + timing-safe比較）。Next.js側は成功時にhttpOnly署名cookie（12時間）、WordPress側は都度照合
 - パスワード試行は簡易rate limit（10分10回。Next.js側はインスタンス内メモリ、WordPress側はtransient）
 - アップロードはWordPress server側でMIME / 拡張子 / magic number / サイズを許可リスト検証
@@ -322,6 +326,7 @@ npx tsx scripts/import-office-people.ts   # dry-run変換
 - 立ち絵素材のアップロード / ダウンロード（共通パスワード方式）
 - mock fallback（Supabase未設定でも全画面動作）
 - SQL / importスクリプト（dry-run）
+- 管理画面からのミュージシャン追加
 
 ## v0.2以降のTODO
 
@@ -330,7 +335,7 @@ npx tsx scripts/import-office-people.ts   # dry-run変換
 - import script の実DB insert
 - 素材の非公開配信（signed URL等）の検討
 - アイコン画像のカスタムアップロード（Supabase Storage / 正方形警告）
-- 管理画面でのデータ管理（v0.1はSQL/dashboard運用）
+- 管理画面での既存データ編集・削除
 - basePath対応（`emnrecords.com/musicians` 配下への移行オプション）
 - rate limitの永続化（KV等）
 
