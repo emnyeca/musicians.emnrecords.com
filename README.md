@@ -2,7 +2,9 @@
 
 EMN Records公式のミュージシャン名鑑・クレジット生成・立ち絵素材配布ツール。
 
-公開予定URL: `https://musicians.emnrecords.com`（`NEXT_PUBLIC_APP_URL`で管理。ハードコードしない）
+公開URL: `https://artists.emnrecords.com`（`NEXT_PUBLIC_APP_URL`で管理。ハードコードしない）
+
+※ リポジトリ名は `musicians.emnrecords.com` のままだが、公開URLは `artists` サブドメイン。当初の `musicians.emnrecords.com` はVercelのエッジ設定がプラットフォーム側の問題で壊れたホスト名として使用不能になったため、公開前に `artists` へ切り替えた（リポジトリ名は機能に影響しないため維持）。
 
 ## 目的
 
@@ -54,7 +56,7 @@ npm run dev
 
 | 変数 | 内容 |
 | --- | --- |
-| `NEXT_PUBLIC_APP_URL` | 公開URL。本番は `https://musicians.emnrecords.com` |
+| `NEXT_PUBLIC_APP_URL` | 公開URL。本番は `https://artists.emnrecords.com` |
 | `NEXT_PUBLIC_SUPABASE_URL` | SupabaseプロジェクトURL |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key（`NEXT_PUBLIC_SUPABASE_ANON_KEY`でも可） |
 | `NEXT_PUBLIC_WORDPRESS_ASSET_UPLOAD_ENDPOINT` | 立ち絵アップロード先のWordPress custom endpoint URL（例: `https://emnrecords.com/wp-json/emn-musicians/v1/standing-assets/upload`）。URL自体は公開情報 |
@@ -137,7 +139,7 @@ node -e "console.log(require('crypto').createHash('sha256').update('ここにパ
    define('EMN_MUSICIANS_SUPABASE_URL', 'https://xxxx.supabase.co');
    define('EMN_MUSICIANS_SUPABASE_SECRET_KEY', '<Supabase secret (service_role) key>');
    // 任意（デフォルト: 下記2origin / 20MB / 5件）
-   // define('EMN_MUSICIANS_ALLOWED_ORIGINS', 'https://musicians.emnrecords.com,http://localhost:3000');
+   // define('EMN_MUSICIANS_ALLOWED_ORIGINS', 'https://artists.emnrecords.com,http://localhost:3000');
    // define('EMN_MUSICIANS_MAX_FILE_BYTES', 20971520);
    // define('EMN_MUSICIANS_MAX_ASSETS_PER_MUSICIAN', 5);
    ```
@@ -154,7 +156,7 @@ node -e "console.log(require('crypto').createHash('sha256').update('ここにパ
 
 WordPress endpointは以下のoriginのみ許可する（ワイルドカード`*`は使わない）。OPTIONS preflightにも応答する。
 
-- `https://musicians.emnrecords.com`
+- `https://artists.emnrecords.com`
 - `http://localhost:3000`
 
 変更する場合は `EMN_MUSICIANS_ALLOWED_ORIGINS`（カンマ区切り）で上書きする。
@@ -272,22 +274,23 @@ npx tsx scripts/import-office-people.ts ../office/knowledge/wordpress/credits/pe
 
 1. Vercelで本リポジトリをimport（Framework: Next.js、設定はデフォルトでよい）
 2. 環境変数を設定（上記の表を参照。Production/Preview両方）
-3. Settings → Domains に `musicians.emnrecords.com` を追加
+3. Settings → Domains に `artists.emnrecords.com` を追加
 
 ### DNS設定（ConoHa側・ユーザー作業）
 
 ConoHa WINGのDNS設定で、サブドメイン `musicians` のCNAMEレコードを追加:
 
 ```text
-musicians.emnrecords.com  CNAME  cname.vercel-dns.com
+artists.emnrecords.com  CNAME  cname.vercel-dns.com
 ```
 
 （Vercelのドメイン追加画面に表示される値を正とする。`emnrecords.com`本体のWordPress運用には影響しない）
 
 ### URL方針
 
-- v0.1: サブドメイン `musicians.emnrecords.com`
+- v0.1: サブドメイン `artists.emnrecords.com`
 - 将来候補: `emnrecords.com/musicians`（basePath移行を想定し、URLは全て`NEXT_PUBLIC_APP_URL`基準で生成している）
+- `musicians.emnrecords.com` は使用不能（Vercelエッジ設定の破損がプラットフォーム側に残存）。将来復旧が確認できたら、`artists` への301リダイレクト用として再追加してもよい
 
 ## セキュリティ上の制約まとめ
 

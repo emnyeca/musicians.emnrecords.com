@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: EMN Musicians Assets
- * Description: Custom REST endpoint for EMN Records Musician Directory (musicians.emnrecords.com). Receives standing asset uploads (PNG/JPEG/WebP, up to 20MB) directly from the browser, stores them in the Media Library and writes metadata to Supabase. Uploads do NOT pass through Vercel.
+ * Description: Custom REST endpoint for EMN Records Musician Directory (artists.emnrecords.com). Receives standing asset uploads (PNG/JPEG/WebP, up to 20MB) directly from the browser, stores them in the Media Library and writes metadata to Supabase. Uploads do NOT pass through Vercel.
  * Version: 0.1.0
  * Author: EMN Records
  *
@@ -11,7 +11,7 @@
  *   define('EMN_MUSICIANS_SUPABASE_SECRET_KEY', '<Supabase secret / service_role key>');
  *
  * Optional constants:
- *   define('EMN_MUSICIANS_ALLOWED_ORIGINS', 'https://musicians.emnrecords.com,http://localhost:3000');
+ *   define('EMN_MUSICIANS_ALLOWED_ORIGINS', 'https://artists.emnrecords.com,http://localhost:3000');
  *   define('EMN_MUSICIANS_MAX_FILE_BYTES', 20971520);          // default 20MB
  *   define('EMN_MUSICIANS_MAX_ASSETS_PER_MUSICIAN', 5);        // default 5
  *
@@ -56,7 +56,7 @@ function emn_musicians_allowed_origins() {
     if (defined('EMN_MUSICIANS_ALLOWED_ORIGINS') && EMN_MUSICIANS_ALLOWED_ORIGINS !== '') {
         return array_filter(array_map('trim', explode(',', EMN_MUSICIANS_ALLOWED_ORIGINS)));
     }
-    return array('https://musicians.emnrecords.com', 'http://localhost:3000');
+    return array('https://artists.emnrecords.com', 'http://localhost:3000');
 }
 
 /**
