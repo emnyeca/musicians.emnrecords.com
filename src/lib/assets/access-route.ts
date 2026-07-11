@@ -12,7 +12,7 @@ import {
 } from "./access";
 
 /**
- * Shared POST (login) / DELETE (logout) handlers for the two password gates.
+ * Shared POST (login) / DELETE (logout) handlers for the admin password gate.
  * Passwords are verified server-side; success sets an httpOnly cookie.
  */
 export function makeAccessRouteHandlers(scope: AccessScope) {

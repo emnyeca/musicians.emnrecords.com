@@ -3,17 +3,11 @@
 --
 -- v0.1 model (no Supabase Auth yet):
 -- * Anonymous (publishable/anon key): read public data only.
--- * members_only asset READS: the password-gated Next.js server routes use
---   the secret (service_role) key, which bypasses RLS.
--- * standing_assets WRITES: the WordPress custom upload endpoint
---   (wordpress-plugin/emn-musicians-assets) inserts with the Supabase secret
---   key kept on the WordPress server. Browsers never write directly.
 -- * v0.2+: replace the "authenticated" template policies below with real
 --   per-user ownership once Supabase Auth is introduced.
 
 alter table musicians enable row level security;
 alter table musician_links enable row level security;
-alter table standing_assets enable row level security;
 alter table credit_exports enable row level security;
 alter table credit_format_templates enable row level security;
 
@@ -35,15 +29,6 @@ create policy "musician_links_public_read" on musician_links
         and m.visibility = 'public'
     )
   );
-
--- standing_assets: only public+active assets are visible to anonymous
--- clients (used by the public musician detail page). members_only assets are
--- fetched exclusively through server routes using the service_role key after
--- the shared-password check.
-drop policy if exists "standing_assets_public_read" on standing_assets;
-create policy "standing_assets_public_read" on standing_assets
-  for select
-  using (visibility = 'public' and is_active);
 
 -- credit_exports: no anonymous access. Server-side (service_role) only in
 -- v0.1; per-user policies come with Supabase Auth in v0.2.
