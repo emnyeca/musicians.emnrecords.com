@@ -42,10 +42,18 @@ create table if not exists musicians (
   vrc_name text,
   discord_name text,
   -- public | draft | hidden
-  visibility text default 'draft',
-  is_verified boolean default false,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
+  visibility text not null default 'draft',
+  is_verified boolean not null default false,
+  version integer not null default 1 check (version > 0),
+  is_locked boolean not null default false,
+  locked_at timestamptz,
+  locked_reason text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint musicians_lock_details_check check (
+    (is_locked and locked_at is not null)
+    or (not is_locked and locked_at is null and locked_reason is null)
+  )
 );
 
 create index if not exists musicians_visibility_idx on musicians (visibility);
@@ -72,6 +80,92 @@ create table if not exists musician_links (
 
 create index if not exists musician_links_musician_idx
   on musician_links (musician_id, display_order);
+
+-- Discord Interaction受付 ----------------------------------------------------
+
+create table if not exists musician_representatives (
+  id uuid primary key default gen_random_uuid(),
+  musician_id uuid not null references musicians(id) on delete cascade,
+  discord_user_id text not null,
+  discord_username_snapshot text,
+  is_active boolean not null default true,
+  assigned_by_operator text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- 初期運用では、1レコードにつき有効な代表者は1名、1アカウントにつき
+-- 有効な代表先は1レコードに限定する。代表者変更時は旧行を無効化する。
+create unique index if not exists musician_representatives_one_active_per_musician
+  on musician_representatives (musician_id) where is_active;
+create unique index if not exists musician_representatives_one_active_per_user
+  on musician_representatives (discord_user_id) where is_active;
+
+drop trigger if exists musician_representatives_set_updated_at
+  on musician_representatives;
+create trigger musician_representatives_set_updated_at
+  before update on musician_representatives
+  for each row execute function set_updated_at();
+
+create table if not exists profile_update_sessions (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid unique not null default gen_random_uuid(),
+  discord_interaction_id text unique not null,
+  discord_user_id text not null,
+  musician_id uuid not null references musicians(id) on delete cascade,
+  base_version integer not null check (base_version > 0),
+  submitted_payload jsonb not null,
+  validated_payload jsonb not null,
+  expires_at timestamptz not null,
+  consumed_at timestamptz,
+  created_at timestamptz not null default now(),
+  constraint profile_update_sessions_expiry_check check (expires_at > created_at),
+  constraint profile_update_sessions_consumed_check check (
+    consumed_at is null or consumed_at >= created_at
+  )
+);
+
+create index if not exists profile_update_sessions_lookup_idx
+  on profile_update_sessions (discord_user_id, musician_id, expires_at);
+
+create table if not exists musician_audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  musician_id uuid references musicians(id) on delete set null,
+  actor_discord_user_id text,
+  actor_kind text not null check (actor_kind in ('self', 'operator', 'system')),
+  action text not null check (
+    action in (
+      'profile_update', 'profile_update_failed', 'lock', 'unlock',
+      'restore', 'representative_set', 'representative_revoked'
+    )
+  ),
+  changed_fields text[] not null default '{}',
+  before_snapshot jsonb,
+  after_snapshot jsonb,
+  interaction_id text unique,
+  result text not null check (result in ('succeeded', 'rejected', 'failed')),
+  error_code text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists musician_audit_logs_musician_created_idx
+  on musician_audit_logs (musician_id, created_at desc);
+
+-- 監査ログは追記専用。service roleを含む通常接続からの変更・削除も拒否する。
+create or replace function prevent_musician_audit_log_mutation()
+returns trigger
+language plpgsql
+as $$
+begin
+  raise exception 'musician_audit_logs is append-only';
+end;
+$$;
+
+drop trigger if exists musician_audit_logs_prevent_update
+  on musician_audit_logs;
+create trigger musician_audit_logs_prevent_update
+  before update or delete on musician_audit_logs
+  for each row execute function prevent_musician_audit_log_mutation();
 
 -- credit_exports ---------------------------------------------------------------
 

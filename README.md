@@ -6,8 +6,8 @@
 
 - 公開名鑑: ログインなしで名前、担当、公開SNSリンクを閲覧できます。
 - Credit作成: 名鑑から出演者を選び、一時編集・並び替えをして複数形式で出力できます。一時編集は名鑑DBへ書き戻しません。
-- 情報入力: 専用Discord BotのModalを正規の入口とします。既存の自己紹介投稿はクロールしません。
-- 公開反映: Discord入力を二重に検証し、本人が変更できる公開項目だけを監査ログと同時に即時反映します。通常の事前承認は行いません。
+- 情報入力: Discord Interactionを正規の入口とし、slash command、Modal、ephemeral preview、buttonで本人プロフィールを受け付けます。既存の自己紹介投稿はクロールしません。
+- 公開反映: Modal submitでは確定せず、本人がpreviewの`[反映する]`を押した後、再認可・再検証して監査ログと同時に反映します。通常の運営者承認は行いません。
 - 対象外: 立ち絵その他の非公開ファイルのアップロード、保管、ダウンロードは行いません。
 - 対象外: Discord OAuthによるWeb上の本人編集は行いません。
 
@@ -18,7 +18,7 @@
 - Next.js App Router + TypeScript + Tailwind CSS
 - Supabase PostgreSQL
 - Vercel
-- Discord Bot（今後追加。Modal受付、ロック申請、運営操作）
+- Discord HTTP Interactions Endpoint（今後追加。Next.js Route Handlerで受付）
 
 ブラウザとDiscord BotにSupabaseのservice-role keyを渡しません。匿名クライアントはRLSにより公開レコードだけを読み取れます。DBへの書き込みは、入力検証・認可・監査を行うサーバー側境界に限定します。
 
@@ -26,7 +26,7 @@
 
 現在実装済みなのは、公開名鑑、Credit作成、運営者用のミュージシャン追加画面、公開データを匿名ユーザーの読み取りだけに制限するRLSです。
 
-Discord Modalによる本人入力は今後の機能です。現時点の`sql/001_init.sql`には、代表者との紐づけ、レコード単位のロック、更新競合を防ぐ版番号、Discord interaction IDによる二重実行防止、追記専用の監査ログはまだありません。これらは [実装段階ごとのAI作業者向けプロンプト](docs/implementation-prompts.md) の第1段階で、初期SQLの再設計とともに追加します。
+Discord Interactionによる本人プロフィール受付は今後の機能です。その基盤となる代表者、レコード単位ロック、版番号、短命の更新session、Discord interaction IDによる二重実行防止、追記専用監査ログは初期SQLへ追加済みです。`/api/discord/interactions`、署名検証、command・Modal・preview button、確定transaction、自動テストはまだ未実装であり、[実装段階ごとのAI作業者向けプロンプト](docs/implementation-prompts.md) の第1・第2段階で追加します。
 
 ## ローカル実行
 
