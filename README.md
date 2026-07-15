@@ -24,9 +24,11 @@
 
 ## 現在実装済みの機能と今後の機能
 
-現在実装済みなのは、公開名鑑、Credit作成、運営者用のミュージシャン追加画面、公開データを匿名ユーザーの読み取りだけに制限するRLSです。
+現在実装済みなのは、公開名鑑、Credit作成、運営者用のミュージシャン追加画面、公開データを匿名ユーザーの読み取りだけに制限するRLS、そしてDiscord Interactionによる本人プロフィール受付です。
 
-Discord Interactionによる本人プロフィール受付は今後の機能です。その基盤となる代表者、レコード単位ロック、版番号、短命の更新session、Discord interaction IDによる二重実行防止、追記専用監査ログは初期SQLへ追加済みです。`/api/discord/interactions`、署名検証、command・Modal・preview button、確定transaction、自動テストはまだ未実装であり、[実装段階ごとのAI作業者向けプロンプト](docs/implementation-prompts.md) の第1・第2段階で追加します。
+Discord受付は `/api/discord/interactions`(署名検証、PING応答、3秒以内の初回応答)、`/emn-profile`・`/emn-admin` guild command、Modal、ephemeral preview、確定transaction(session消費・version確認・監査ログ追加を同一transactionで実行)、限定監査チャンネル通知、レコード単位ロック、代表者変更、過去状態への復旧までを含みます。DB側の確定処理は `sql/003_functions.sql` の関数が担います。コード上の実装は自動テストで検証済みですが、実際のDiscordサーバー・検証用DBでの疎通確認は運用開始前に [docs/operator-setup.md](docs/operator-setup.md) の手順で行ってください。
+
+バックアップと復旧の手順は [docs/backup-restore.md](docs/backup-restore.md)、インシデント対応は [docs/incident-response.md](docs/incident-response.md) を参照してください。
 
 ## ローカル実行
 
@@ -42,7 +44,14 @@ npm run dev
 ```bash
 npm run lint
 npm run build
+npm run test
 npx tsx scripts/import-office-people.ts
+```
+
+Discordのguild command登録は、環境変数(`DISCORD_APPLICATION_ID`、`DISCORD_BOT_TOKEN`、`DISCORD_GUILD_ID`)を設定したうえで次を実行します。
+
+```bash
+npx tsx scripts/register-discord-commands.ts
 ```
 
 `import-office-people.ts` は現在dry-runのみです。`nameEn`を推測せず、人間が確定するための変換結果を出力します。

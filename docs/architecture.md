@@ -83,6 +83,9 @@ Discord公式仕様に基づき、次を守る。
 - `/emn-admin representative-set`: 運営者がDiscord user IDとmusician IDを紐づける。
 - `/emn-admin profile-lock`: 運営者が対象レコードをロックする。
 - `/emn-admin profile-unlock`: 運営者がロックを解除する。
+- `/emn-admin profile-hide` / `profile-show`: 運営者が対象レコードを非公開化・再公開する。
+- `/emn-admin profile-restore`: 運営者が監査ログの過去状態を新しい変更として反映する。
+- `/emn-admin audit-list`: 運営者が復旧に使う監査ログIDを確認する。
 
 運営者コマンドはDiscord側で利用者を絞ったうえで、API側でも`DISCORD_OPERATOR_ROLE_ID`を操作時点で再確認する。ユニットやデュオも初期運用では有効な代表者を1名にする。
 

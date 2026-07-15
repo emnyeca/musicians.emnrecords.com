@@ -16,7 +16,7 @@
    - `ASSET_UPLOAD_PASSWORD_HASH`
    - `ASSET_UPLOAD_PASSWORD`
 5. Supabaseの現在のプロジェクトに残すべき実データがないことを確認する。
-6. DBを作り直し、`sql/001_init.sql`、`sql/002_rls.sql`の順に実行する。
+6. DBを作り直し、`sql/001_init.sql`、`sql/002_rls.sql`、`sql/003_functions.sql`の順に実行する。
 7. デプロイ後、旧`/member/*`と立ち絵APIが404になり、`/`、`/musicians`、`/credit-builder`、`/admin`が動くことを確認する。
 
 ## Discord Interaction受付の準備
@@ -24,16 +24,17 @@
 1. Discord Developer PortalでApplicationを作成する。限定監査チャンネルへの投稿にBot userが必要な場合だけBotも有効にし、Administrator権限は与えない。
 2. Applicationを`applications.commands`と必要最小限の権限だけでEMN Recordsサーバーへ追加する。コマンドはglobalではなくguild commandとして登録する。
 3. 登録対象のメンバーロール、運営者ロール、限定監査チャンネルを決め、それぞれのIDを控える。
-4. Vercelへ`/api/discord/interactions`をデプロイした後、そのURLをDeveloper PortalのInteractions Endpoint URLへ設定する。設定前にPING応答とDiscord request署名検証を実装しておく。
-5. `.env.example`に記載されたapplication public key、guild ID、member/operator role IDなどをVercelへ設定する。`SUPABASE_SECRET_KEY`はNext.jsのserver-only環境変数とし、browserやDiscord responseへ出さない。
-6. 将来Botプロセスを分離する場合、Botには`INTAKE_API_SECRET`だけを設定し、`SUPABASE_SECRET_KEY`は設定しない。
-7. Bot token、受付API認証情報、DB認証情報がログ、チャット、commitへ出た場合は直ちに交換する。
+4. `npx tsx scripts/register-discord-commands.ts` でguild commandを登録する(`DISCORD_APPLICATION_ID`、`DISCORD_BOT_TOKEN`、`DISCORD_GUILD_ID`が必要)。`/emn-admin`はDiscordのIntegration設定で運営者ロールだけに許可する。これは補助であり、APIも毎回operator roleを再確認する。
+5. Vercelへ`/api/discord/interactions`をデプロイした後、そのURLをDeveloper PortalのInteractions Endpoint URLへ設定する。PING応答と署名検証は実装済みのため、環境変数を設定してからデプロイすれば検証が通る。
+6. `.env.example`に記載されたapplication public key、guild ID、member/operator role IDなどをVercelへ設定する。`SUPABASE_SECRET_KEY`はNext.jsのserver-only環境変数とし、browserやDiscord responseへ出さない。
+7. 将来Botプロセスを分離する場合、Botには`INTAKE_API_SECRET`だけを設定し、`SUPABASE_SECRET_KEY`は設定しない。
+8. Bot token、受付API認証情報、DB認証情報がログ、チャット、commitへ出た場合は直ちに交換する(手順は [incident-response.md](incident-response.md))。
 
 ## DBと復旧手段の準備
 
 1. 開発・検証用のSupabaseプロジェクトを本番とは別に用意する。
 2. 初期運用では有料プランを前提にせず、利用時点のSupabase FreeとProのバックアップ機能・保存期間を確認する。Supabase Freeに自動バックアップがあるとは仮定しない。
-3. Supabase CLIの`db dump`、`pg_dump`、または管理者向けJSON exportのうち、現行スキーマを復元できる方法で論理バックアップを作成する。
+3. `scripts/backup/backup-db.ps1`(Windows)または`scripts/backup/backup-db.sh`で暗号化論理バックアップを作成する。詳細は [backup-restore.md](backup-restore.md) を参照する。
 4. 論理バックアップは週1回、または大きな登録・更新の前後に作成する。
 5. dumpまたはJSON exportを暗号化し、Supabaseプロジェクト外の最低2箇所へ保存する。初期の保存先はローカルPCと、外部ストレージまたはクラウドストレージの組み合わせを基準にする。
 6. バックアップを公開GitHubリポジトリへ置かない。privateリポジトリへ保存する場合も必ず暗号化する。DB接続文字列、パスワード、復号鍵はリポジトリへ保存しない。
