@@ -53,52 +53,6 @@ export type Musician = {
   links: MusicianLink[];
 };
 
-/** Minimal musician info embedded into other records (e.g. standing assets). */
-export type MusicianSummary = Pick<
-  Musician,
-  "id" | "slug" | "displayName" | "nameJp" | "nameEn" | "roles" | "iconImageUrl"
->;
-
-export type StandingAssetVisibility = "public" | "members_only";
-
-export type StandingAssetStorageBackend =
-  | "wordpress_media"
-  | "supabase_storage"
-  | "external";
-
-export type StandingAsset = {
-  id: string;
-  musicianId: string;
-  /** Joined musician info for display. Null when the join is unavailable. */
-  musician: MusicianSummary | null;
-  title: string;
-  description: string | null;
-  /**
-   * Direct file URL (WordPress uploads on ConoHa in v0.1).
-   * NOTE: this is a normal public URL — members_only is "limited sharing",
-   * not strict private storage. Anyone who knows the URL can access it.
-   */
-  fileUrl: string;
-  storageBackend: StandingAssetStorageBackend;
-  wpMediaId: number | null;
-  originalFilename: string | null;
-  storedFilename: string | null;
-  mimeType: string | null;
-  fileSizeBytes: number | null;
-  visibility: StandingAssetVisibility;
-  accessNote: string | null;
-  allowCreditUse: boolean;
-  allowThumbnailUse: boolean;
-  allowCropping: boolean;
-  allowColorAdjustment: boolean;
-  requireCredit: boolean;
-  creditText: string | null;
-  usageTerms: string | null;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
-
 /**
  * One selected person inside the credit builder.
  *

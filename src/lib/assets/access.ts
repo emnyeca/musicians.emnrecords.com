@@ -2,22 +2,15 @@ import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 
 /**
- * Shared-password access control for member pages (server-side only).
- *
- * Independent scopes with separate passwords:
- * - "member-download": /member/standing-assets (download page)
- * - "asset-upload":    /member/upload-standing-asset (upload page)
- * - "admin":           /admin (database management)
+ * Transitional shared-password access control for the operator-only admin.
  *
  * On success an HMAC-signed, httpOnly cookie grants access for 12 hours.
  * Passwords are verified server-side only and never reach the client bundle.
  */
 
-export type AccessScope = "member-download" | "asset-upload" | "admin";
+export type AccessScope = "admin";
 
 export const ACCESS_COOKIE_NAMES: Record<AccessScope, string> = {
-  "member-download": "emn_member_access",
-  "asset-upload": "emn_upload_access",
   admin: "emn_admin_access",
 };
 
@@ -28,8 +21,6 @@ export const ACCESS_SESSION_SECONDS = 12 * 60 * 60; // 12 hours
  * vars. Never active when NODE_ENV === "production".
  */
 const DEV_FALLBACK_PASSWORDS: Record<AccessScope, string> = {
-  "member-download": "member-dev",
-  "asset-upload": "upload-dev",
   admin: "admin-dev",
 };
 
@@ -46,18 +37,8 @@ function sha256Hex(input: string): string {
 }
 
 function getScopeSecret(scope: AccessScope): ScopeSecret | null {
-  const hash =
-    scope === "member-download"
-      ? process.env.MEMBER_DOWNLOAD_PASSWORD_HASH
-      : scope === "asset-upload"
-        ? process.env.ASSET_UPLOAD_PASSWORD_HASH
-        : process.env.ADMIN_PASSWORD_HASH;
-  const plain =
-    scope === "member-download"
-      ? process.env.MEMBER_DOWNLOAD_PASSWORD
-      : scope === "asset-upload"
-        ? process.env.ASSET_UPLOAD_PASSWORD
-        : process.env.ADMIN_PASSWORD;
+  const hash = process.env.ADMIN_PASSWORD_HASH;
+  const plain = process.env.ADMIN_PASSWORD;
 
   let passwordSha256Hex: string | null = null;
   let usingDevFallback = false;

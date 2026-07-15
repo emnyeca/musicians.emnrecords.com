@@ -33,7 +33,6 @@ export default async function AdminPage() {
     );
   }
 
-  const uploadEndpoint = process.env.NEXT_PUBLIC_WORDPRESS_ASSET_UPLOAD_ENDPOINT;
   const rows: { label: string; ok: boolean; note: string }[] = [
     {
       label: "Supabase",
@@ -41,7 +40,7 @@ export default async function AdminPage() {
       note: isSupabaseConfigured()
         ? hasSupabaseServiceRole()
           ? "接続設定あり（secret keyあり）"
-          : "接続設定あり（secret key未設定 — members_only素材の取得に必要）"
+          : "接続設定あり（secret key未設定 — 管理操作に必要）"
         : "未設定 — mockデータで表示中",
     },
     {
@@ -50,31 +49,6 @@ export default async function AdminPage() {
       note: isUsingDevFallbackPassword("admin")
         ? "開発用フォールバック使用中（本番では必ず設定）"
         : isAccessConfigured("admin")
-          ? "設定済み"
-          : "未設定",
-    },
-    {
-      label: "WordPress upload endpoint",
-      ok: Boolean(uploadEndpoint),
-      note: uploadEndpoint
-        ? "設定済み — ブラウザからWordPressへ直接アップロード"
-        : "未設定 — 開発時はローカルAPIでシミュレートします",
-    },
-    {
-      label: "Download password",
-      ok: isAccessConfigured("member-download"),
-      note: isUsingDevFallbackPassword("member-download")
-        ? "開発用フォールバック使用中（本番では必ず設定）"
-        : isAccessConfigured("member-download")
-          ? "設定済み"
-          : "未設定",
-    },
-    {
-      label: "Upload password",
-      ok: isAccessConfigured("asset-upload"),
-      note: isUsingDevFallbackPassword("asset-upload")
-        ? "開発用フォールバック使用中（本番では必ず設定）"
-        : isAccessConfigured("asset-upload")
           ? "設定済み"
           : "未設定",
     },
@@ -124,18 +98,6 @@ export default async function AdminPage() {
       </section>
 
       <div className="flex flex-wrap gap-3 text-xs">
-        <Link
-          href="/member/standing-assets"
-          className="text-muted underline-offset-2 hover:text-ink hover:underline"
-        >
-          Standing assets (download)
-        </Link>
-        <Link
-          href="/member/upload-standing-asset"
-          className="text-muted underline-offset-2 hover:text-ink hover:underline"
-        >
-          Standing assets (upload)
-        </Link>
         <Link
           href="/musicians"
           className="text-muted underline-offset-2 hover:text-ink hover:underline"

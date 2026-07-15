@@ -6,8 +6,7 @@ export function SiteFooter() {
           EMN Records — Musician Directory &amp; Credit Builder
         </p>
         <p className="text-[11px] text-muted/80">
-          © EMN Records. Profile details are maintained by each musician via
-          their own links.
+          © EMN Records.掲載情報は本人からの申請を運営が確認して管理します。
         </p>
       </div>
     </footer>

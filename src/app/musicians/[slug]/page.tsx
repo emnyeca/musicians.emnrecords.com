@@ -6,7 +6,6 @@ import { IconImage } from "@/components/icon-image";
 import { MusicianDetailActions } from "@/components/musician-detail-actions";
 import { Badge } from "@/components/ui/badge";
 import { getMusicianBySlug } from "@/lib/data/musicians";
-import { getPublicStandingAssetsForMusician } from "@/lib/assets/standing-assets";
 import { displayUrl } from "@/lib/utils/sns";
 import { musicianProfileUrl } from "@/lib/utils/url";
 
@@ -42,7 +41,6 @@ export default async function MusicianDetailPage({ params }: PageProps) {
   const musician = await getMusicianBySlug(slug);
   if (!musician) notFound();
 
-  const publicAssets = await getPublicStandingAssetsForMusician(musician.id);
   const links = musician.links.filter((l) => l.isPublic);
 
   return (
@@ -118,22 +116,6 @@ export default async function MusicianDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      {publicAssets.length > 0 ? (
-        <section className="rounded-xl border border-line bg-surface p-4">
-          <h2 className="text-sm font-medium text-ink">Standing assets</h2>
-          <p className="mt-1 text-xs text-muted">
-            Public standing assets are registered for this musician. Download
-            is provided on the member page shared in the EMN Records Discord.
-          </p>
-          <ul className="mt-2 flex flex-col gap-1">
-            {publicAssets.map((asset) => (
-              <li key={asset.id} className="text-xs text-muted">
-                ・{asset.title}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
     </div>
   );
 }

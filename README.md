@@ -1,349 +1,52 @@
 # EMN Records Musician Directory & Credit Builder
 
-EMN Records公式のミュージシャン名鑑・クレジット生成・立ち絵素材配布ツール。
+`musicians.emnrecords.com` は、公開情報だけを扱うミュージシャン名鑑とCredit作成支援Webアプリです。
 
-公開URL: `https://musicians.emnrecords.com`（`NEXT_PUBLIC_APP_URL`で管理。ハードコードしない）
+## 現在のプロダクト境界
 
-※ 一時的に `artists.emnrecords.com` を代替URLとして使っていたが、Vercel側のFramework設定をNext.jsへ修正したため、正式URLは `musicians.emnrecords.com` に戻す。
+- 公開名鑑: ログインなしで名前、担当、公開SNSリンクを閲覧できます。
+- Credit作成: 名鑑から出演者を選び、一時編集・並び替えをして複数形式で出力できます。一時編集は名鑑DBへ書き戻しません。
+- 情報入力: Discord Interactionを正規の入口とし、slash command、Modal、ephemeral preview、buttonで本人プロフィールを受け付けます。既存の自己紹介投稿はクロールしません。
+- 公開反映: Modal submitでは確定せず、本人がpreviewの`[反映する]`を押した後、再認可・再検証して監査ログと同時に反映します。通常の運営者承認は行いません。
+- 対象外: 立ち絵その他の非公開ファイルのアップロード、保管、ダウンロードは行いません。
+- 対象外: Discord OAuthによるWeb上の本人編集は行いません。
 
-## 目的
+方針とセキュリティ境界は [docs/architecture.md](docs/architecture.md)、導入作業は [docs/operator-setup.md](docs/operator-setup.md)、実装順は [docs/implementation-prompts.md](docs/implementation-prompts.md) を参照してください。
 
-1. バーチャルミュージシャンの公開名鑑として、外部への広報・導線になる
-2. イベンターが出演者を選択し、クレジット表記を簡単に生成できる
-3. 告知サムネイル・クレジット制作用の立ち絵素材を、確認済みメンバーが簡単にダウンロードできる
+## 技術構成
 
-通常時は「ミュージシャン名鑑」として見え、クレジット生成は必要なときだけONにする便利機能。立ち絵素材は公開名鑑とは別の、共通パスワード保護されたメンバー向けページで扱う。
+- Next.js App Router + TypeScript + Tailwind CSS
+- Supabase PostgreSQL
+- Vercel
+- Discord HTTP Interactions Endpoint（今後追加。Next.js Route Handlerで受付）
 
-## 技術スタック
+ブラウザとDiscord BotにSupabaseのservice-role keyを渡しません。匿名クライアントはRLSにより公開レコードだけを読み取れます。DBへの書き込みは、入力検証・認可・監査を行うサーバー側境界に限定します。
 
-- Next.js (App Router) + TypeScript + Tailwind CSS
-- Supabase PostgreSQL（未設定時はmockデータで全画面動作）
-- WordPress custom plugin（`wordpress-plugin/emn-musicians-assets`）+ ConoHa WING上のWordPress uploads（立ち絵の受け口・置き場）
-- Vercel deploy想定（**Vercelは20MBアップロードを受けない**。名鑑UI・クレジット生成UI・ダウンロードUIのみ担当）
+## 現在実装済みの機能と今後の機能
 
-## ローカル起動
+現在実装済みなのは、公開名鑑、Credit作成、運営者用のミュージシャン追加画面、公開データを匿名ユーザーの読み取りだけに制限するRLSです。
+
+Discord Interactionによる本人プロフィール受付は今後の機能です。その基盤となる代表者、レコード単位ロック、版番号、短命の更新session、Discord interaction IDによる二重実行防止、追記専用監査ログは初期SQLへ追加済みです。`/api/discord/interactions`、署名検証、command・Modal・preview button、確定transaction、自動テストはまだ未実装であり、[実装段階ごとのAI作業者向けプロンプト](docs/implementation-prompts.md) の第1・第2段階で追加します。
+
+## ローカル実行
 
 ```bash
 npm install
 npm run dev
 ```
 
-環境変数なしで起動でき、mockデータ（`src/lib/data/mock-*.ts`）で全画面が動く。
+環境変数は `.env.example` を参照してください。Supabase未設定時はmockデータで公開画面を確認できます。
 
-開発時のみ、パスワード未設定の場合は以下のフォールバックが有効:
-
-- ダウンロードページ（`/member/standing-assets`）: `member-dev`
-- アップロードページ（`/member/upload-standing-asset`）: `upload-dev`
-- 管理画面（`/admin`）: `admin-dev`
-
-本番（`NODE_ENV=production`）ではフォールバックは無効。環境変数の設定が必須。
-
-## 主要画面
-
-| パス | 内容 |
-| --- | --- |
-| `/musicians` | 名鑑一覧。検索・role絞り込み・クレジット作成モード |
-| `/musicians/[slug]` | 詳細ページ（OGP対応） |
-| `/credit-builder` | クレジット生成。一時編集・並び替え・7形式出力 |
-| `/member/standing-assets` | 立ち絵ダウンロード（共通パスワード、noindex） |
-| `/member/upload-standing-asset` | 立ち絵アップロード（別パスワード、noindex） |
-| `/admin` | 管理者パスワード保護。設定状況確認とミュージシャン追加（noindex） |
-
-## 環境変数
-
-`.env.example` を `.env.local` にコピーして設定する。
-
-### Public（ブラウザに公開される）
-
-| 変数 | 内容 |
-| --- | --- |
-| `NEXT_PUBLIC_APP_URL` | 公開URL。本番は `https://musicians.emnrecords.com` |
-| `NEXT_PUBLIC_SUPABASE_URL` | SupabaseプロジェクトURL |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key（`NEXT_PUBLIC_SUPABASE_ANON_KEY`でも可） |
-| `NEXT_PUBLIC_WORDPRESS_ASSET_UPLOAD_ENDPOINT` | 立ち絵アップロード先のWordPress custom endpoint URL（例: `https://emnrecords.com/wp-json/emn-musicians/v1/standing-assets/upload`）。URL自体は公開情報 |
-
-### Server-only（絶対に `NEXT_PUBLIC` を付けない）
-
-| 変数 | 内容 |
-| --- | --- |
-| `SUPABASE_SECRET_KEY` | Supabase secret (service_role) key。members_only素材の取得に必要 |
-| `MEMBER_DOWNLOAD_PASSWORD_HASH` | ダウンロードページ共通パスワードのsha256 hexハッシュ（推奨） |
-| `MEMBER_DOWNLOAD_PASSWORD` | 同・平文（v0.1の暫定。本番はhashへ移行すること） |
-| `ASSET_UPLOAD_PASSWORD_HASH` | アップロードページパスワードのハッシュ。**download用と必ず別にする**。WordPress側の `EMN_MUSICIANS_UPLOAD_PASSWORD_HASH` と同じ値を設定する |
-| `ASSET_UPLOAD_PASSWORD` | 同・平文（暫定） |
-| `ADMIN_PASSWORD_HASH` | 管理画面用パスワードのsha256 hexハッシュ（推奨）。download/upload用とは必ず別にする |
-| `ADMIN_PASSWORD` | 同・平文（暫定） |
-| `ACCESS_TOKEN_SECRET` | 任意。アクセスcookie署名用（未設定時はパスワードから導出） |
-
-legacy: 旧構成で使っていた `WORDPRESS_BASE_URL` / `WORDPRESS_UPLOAD_USERNAME` / `WORDPRESS_APPLICATION_PASSWORD` は**不要**になった。Next.js側にWordPress Application Passwordを持たせない（発行済みのものがあればrevokeしてよい）。
-
-パスワードハッシュの生成:
-
-```bash
-node -e "console.log(require('crypto').createHash('sha256').update('ここにパスワード').digest('hex'))"
-```
-
-認証成功時はhttpOnly cookie（12時間有効、HMAC署名付き）が発行される。「アクセスを終了」ボタンでいつでも破棄できる。
-
-## Supabase setup
-
-1. Supabaseプロジェクト `musicians.emnrecords.com` を開く
-2. SQL Editorで `sql/001_init.sql` → `sql/002_rls.sql` の順に実行
-3. Project Settings → API から URL / publishable key / secret key を環境変数に設定
-
-### schema概要
-
-- `musicians` — 名鑑の正本。`roles text[]`が「担当」の正本フィールド（**`instruments`は作らない**）。`icon_image_url` / `icon_image_source` / `icon_storage_path` でアイコン管理
-- `musician_links` — SNS等のリンク（platform / display_order / is_public）
-- `standing_assets` — 立ち絵素材metadata。ファイル本体はWordPress uploads。素材ごとのパスワードは持たない（ページ全体を共通パスワードで保護）
-- `credit_exports` — クレジット生成履歴。`selected_people`に一時編集込みのスナップショットを保存してよいが、**musiciansへ書き戻さない**
-- `credit_format_templates` — Custom Formatテンプレート（v0.1のUI保存はlocalStorage）
-
-### RLS方針
-
-- 匿名（publishable key）: public musicians / public links / public+activeな standing_assets のみselect可
-- members_only素材の**読み取り**は、パスワード認証済みのNext.js server routeがservice role key（RLSバイパス）で取得する
-- standing_assetsへの**書き込み**は、WordPress custom endpointがWordPressサーバー側のSupabase secret keyで行う
-- ブラウザからstanding_assetsへ直接writeしない
-- `credit_format_templates` はpublicなら誰でもselect可、本人管理はSupabase Auth導入後（v0.2）
-
-## Standing assets upload方針（WordPress custom endpoint）
-
-立ち絵はSupabase Storageではなく**ConoHa WING上のWordPress uploads**に保存する。理由: ConoHaの容量が余っており、Supabase Freeは20MB級ファイルにはすぐ上限が来る。立ち絵はWeb表示でなくダウンロード用途のため、WordPressのMedia Libraryで十分。
-
-さらに、**20MB級のアップロードはVercelを経由しない**。Vercel serverless functionのrequest body上限（約4.5MB）があるため、アップロードの受け口はConoHa上のWordPressに寄せている。
-
-### アップロードの流れ
-
-```text
-ブラウザ（upload form）
-  → WordPress custom endpoint
-    POST /wp-json/emn-musicians/v1/standing-assets/upload
-  → WordPress Media Library / uploads（ConoHa）
-  → WordPressサーバーからSupabase standing_assets へmetadata保存
-```
-
-- 認証はDiscordで共有する**アップロード用共通パスワード**（formで送信し、WordPress側でsha256ハッシュと`hash_equals`照合）。管理者パスワードやApplication Passwordではなく、漏洩時は定数変更でローテーションできる
-- 許可形式: PNG / JPEG / WebP のみ、最大20MB、1人あたり最大5件
-- MIME type・拡張子に加えて**magic number**（PNG: `89 50 4E 47...` / JPEG: `FF D8 FF` / WebP: `RIFF....WEBP`）を検証し、SVG / HTML / ZIP / PDF / PSD / CLIP / 不明形式はreject
-- ファイル名はユーザー入力を使わず、server側で `slug-日時-乱数.拡張子` に置換
-- 原本をそのまま保存する（`-scaled`コピーや中間サイズは生成しない）
-- **Supabaseへのmetadata保存に失敗した場合は `wp_delete_attachment()` でファイルを削除**し、孤児ファイルを残さない
-- Supabase secret keyはWordPressサーバー側（wp-config.php）にのみ置く。ブラウザ・Next.js clientには出さない
-- Next.js側の旧route `/api/upload-standing-asset` は**開発用シミュレーションfallback**（本番では410を返す）。`NEXT_PUBLIC_WORDPRESS_ASSET_UPLOAD_ENDPOINT` 未設定時のみformがこちらへ送信する
-
-### WordPress pluginの設置（ユーザー作業）
-
-1. `wordpress-plugin/emn-musicians-assets/` ディレクトリを、WordPressの `wp-content/plugins/` へアップロード（ConoHaのファイルマネージャーまたはFTP）
-2. `wp-config.php` に以下の定数を追加（**実値はGitHubにcommitしない**）:
-
-   ```php
-   define('EMN_MUSICIANS_UPLOAD_PASSWORD_HASH', '<アップロード用パスワードのsha256 hex>');
-   define('EMN_MUSICIANS_SUPABASE_URL', 'https://xxxx.supabase.co');
-   define('EMN_MUSICIANS_SUPABASE_SECRET_KEY', '<Supabase secret (service_role) key>');
-   // 任意（デフォルト: 下記3origin / 20MB / 5件）
-   // define('EMN_MUSICIANS_ALLOWED_ORIGINS', 'https://musicians.emnrecords.com,https://artists.emnrecords.com,http://localhost:3000');
-   // define('EMN_MUSICIANS_MAX_FILE_BYTES', 20971520);
-   // define('EMN_MUSICIANS_MAX_ASSETS_PER_MUSICIAN', 5);
-   ```
-
-3. WordPress管理画面 → プラグイン → 「EMN Musicians Assets」を有効化。定数が未設定の場合、管理画面上部に**設定不足の警告（admin notice）**が表示される（実値は表示しない。不足している定数名のみ）
-4. PHPのアップロード上限を確認する（ConoHa WINGコントロールパネル → PHP設定）: `upload_max_filesize` と `post_max_size` を**25M以上**にする（20MBファイル+フォームデータ分の余裕）
-5. **下記「WordPress REST API疎通確認」の手順1〜3で疎通確認する**（`/wp-json/` → `/health` → `upload` の順）
-6. Vercel側の `NEXT_PUBLIC_WORDPRESS_ASSET_UPLOAD_ENDPOINT` に `https://emnrecords.com/wp-json/emn-musicians/v1/standing-assets/upload` を設定
-7. Next.js側 `ASSET_UPLOAD_PASSWORD_HASH` にWordPressと同じハッシュを設定（ページのゲートとendpoint照合で同じパスワードを使うため）
-
-パスワードローテーション: 新しいパスワードのハッシュを生成し、`EMN_MUSICIANS_UPLOAD_PASSWORD_HASH`（wp-config.php）と `ASSET_UPLOAD_PASSWORD_HASH`（Vercel）を両方更新し、Discordの掲示を差し替える。
-
-### CORS
-
-WordPress endpointは以下のoriginのみ許可する（ワイルドカード`*`は使わない）。OPTIONS preflightにも応答する。
-
-- `https://musicians.emnrecords.com`
-- `https://artists.emnrecords.com`
-- `http://localhost:3000`
-
-変更する場合は `EMN_MUSICIANS_ALLOWED_ORIGINS`（カンマ区切り）で上書きする。
-
-トラブルシューティング: セキュリティ系プラグインがREST APIを制限している場合、`emn-musicians/v1` namespaceを許可すること。
-
-### WordPress REST API疎通確認
-
-pluginの設置後は、必ず**下から順に**疎通確認する。上位（WordPress REST APIそのもの）が失敗している場合、pluginのroute個別の設定を疑っても解決しない。
-
-1. **`/wp-json/` が開くか**（WordPress REST APIのroot）
-
-   ```powershell
-   Invoke-WebRequest -Uri "https://emnrecords.com/wp-json/" -Method GET | Select-Object -ExpandProperty Content
-   ```
-
-   ここが**404になる場合、原因はplugin側ではなくWordPress REST API / rewrite / hosting側**。下記「`/wp-json/` が404になる場合の原因候補」へ進む。JSON（サイト名やnamespace一覧を含む）が返れば正常。
-
-2. **`/wp-json/emn-musicians/v1/health` が開くか**（plugin route + namespace確認。secretは返さない）
-
-   ```powershell
-   Invoke-WebRequest -Uri "https://emnrecords.com/wp-json/emn-musicians/v1/health" -Method GET | Select-Object -ExpandProperty Content
-   ```
-
-   `{"ok":true,"plugin":"emn-musicians-assets","version":"0.1.0"}` が返れば、pluginは正しく読み込まれ有効化されている。ここで404（かつ手順1は成功）の場合、plugin未有効化・ファイル配置ミス・route登録が読み込まれていない（パーマリンク再保存が必要な場合がある）を疑う。
-
-3. **`/wp-json/emn-musicians/v1/standing-assets/upload` はPOST専用**。ブラウザでGETすると405（Method Not Allowed）が正しい応答（404ではない）。疎通確認はPowerShell / curlでPOSTする:
-
-   ```powershell
-   Invoke-WebRequest `
-     -Uri "https://emnrecords.com/wp-json/emn-musicians/v1/standing-assets/upload" `
-     -Method POST `
-     -Body @{ password = "wrong-password-for-test" }
-   ```
-
-   `wp-config.php`の定数が設定済みなら `{"ok":false,"error":"Invalid upload password."}`（HTTP 401）が返れば正常（endpointへ到達し、パスワード検証まで動いている）。定数未設定なら503が返る。
-
-### `/wp-json/` が404になる場合の原因候補
-
-上の手順1が404の場合、考えられる原因（可能性が高い順）:
-
-1. **パーマリンク設定が「基本」（Plain）のまま、または再保存が実際には反映されていない** — 最有力候補。**確定診断方法**: `.htaccess`の `# BEGIN WordPress` 〜 `# END WordPress` の間を見る。ここに `RewriteEngine On` や `RewriteRule` が1行もなく空（コメントのみ）の場合、パーマリンクが「基本」のままである確実な兆候（WordPressコアは「基本」の場合、rewriteルールを意図的に空文字列で書き込むため）。「基本」パーマリンクは実在するPHPファイルへの直接アクセスのみでrewrite不要だが、`/wp-json/`は実在するファイル/ディレクトリではないため、catch-all rewriteが無いとApache側で（WordPressのコードが動く前に）404になる。修正: WordPress管理画面 → 設定 → パーマリンク → 「基本」以外（例: 投稿名）を選び直して保存し、`.htaccess`に実際のrewriteルールが書き込まれたか確認する。書き込まれない場合は`.htaccess`が書き込み不可なので、ConoHaのファイルマネージャー/FTPで手動追記する
-2. **セキュリティ系プラグイン（Wordfence / SiteGuard / All In One WP Security 等）がREST APIを無効化・制限している** — 該当プラグインの設定でREST API制限を一時的にOFFにして再確認する。SiteGuard WP PluginはXML-RPCやログインを保護する過程でREST APIにも影響することがあるので要確認（`.htaccess`に`#SITEGUARD_PLUGIN_SETTINGS_START`〜`END`のマーカーがあり中身が空なのは、対応機能が未使用なら正常。上記1を先に解消してから疑う）
-3. **ConoHa WING側のWAF（コントロールパネルの「WAF設定」）が `/wp-json/` へのアクセスをブロックしている** — WAFログを確認し、必要なら `/wp-json/*` を除外ルールに追加する
-4. **テーマの `functions.php` または mu-plugin でREST APIを無効化するコードが入っている** — `remove_action('init', 'rest_api_init')` や `add_filter('rest_enabled', '__return_false')`、`add_filter('rest_authentication_errors', ...)` 等を検索する
-5. **キャッシュ・高速化プラグイン（WP Fastest Cache等）または静的化構成が `/wp-json/` を含む未知パスに対して独自の404ページを返している** — 該当プラグインの除外設定を確認する
-6. WordPressアドレス/サイトアドレス（設定 → 一般）が実際のアクセスURLと異なる（例: `www` の有無、httpとhttpsの不一致）
-
-上記1で `.htaccess` にrewriteルールが正しく書き込まれているにもかかわらず404が続く場合は、下記「`.htaccess` 確認項目」でセキュリティ系プラグインによる上書き・追加denyルールの有無を確認する。
-
-### `.htaccess` 確認項目
-
-ConoHa WINGのWordPressインストールディレクトリ直下の `.htaccess` に、以下のWordPress標準ブロックが**存在すること**を確認する（`# BEGIN WordPress` 〜 `# END WordPress` で囲まれた部分）:
-
-```apache
-# BEGIN WordPress
-<IfModule mod_rewrite.c>
-RewriteEngine On
-RewriteBase /
-RewriteRule ^index\.php$ - [L]
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule . /index.php [L]
-</IfModule>
-# END WordPress
-```
-
-確認するポイント:
-
-- このブロック自体が**存在しない**場合 → パーマリンクを再保存する（WordPressが自動生成する）。それでも生成されない場合はファイルの書き込み権限を確認する
-- このブロックより**前に** `/wp-json` や `wp-json` を明示的にdenyする `RewriteRule` や `RewriteCond`、`<LocationMatch>` / `<Files>` ディレクティブがないか確認する（セキュリティプラグインが自動追加している場合がある）
-- ConoHa WING独自の追加設定（`Deny from all` 等）が `.htaccess` の他の箇所に無いか確認する
-- 変更前に必ず `.htaccess` のバックアップを取る
-
-## Standing assets download方針
-
-- 共通パスワード認証後、`/api/standing-asset-download?id=...` が**WordPress/ConoHa上のfile_urlへ302 redirect**する
-- 20MB級ファイルをVercel経由でproxy streamしない（ファイル配信はConoHaが担う）
-- 利用条件の同意チェックをしないとDownloadボタンは有効にならない
-
-### members_only素材は「厳密な非公開」ではない（重要）
-
-v0.1ではWordPress Media Library / WordPress uploadsを使うため、members_only素材は厳密な非公開ではない。アプリ上では共通パスワードでダウンロードページを保護するが、**ファイルURLが外部に漏れた場合は直接アクセスできる可能性がある**。これは「限定共有」であり「完全な非公開保管庫」ではない（UI上にも注記あり）。
-
-URL直アクセスも防ぎたい場合は、将来的にWordPress custom plugin、protected directory、signed download token、PHP streaming endpoint、Supabase Storage / S3 signed URL等を検討する。
-
-### 運用
-
-EMN RecordsのメンバーオンリーDiscordチャンネルに、ダウンロードページURLと共通パスワードを掲示する。Discordメンバーは管理者が確認した活動者のみ。素材ごとの個別パスワードは運用負荷が高いため採用しない。
-
-## クレジット生成
-
-- 名鑑でクレジット作成モードON → 出演者を選択 → `/credit-builder`
-- 選択状態・一時編集・Custom FormatはlocalStorageに保存（DBには書かない）
-- **一時編集（override）はmusicians tableを絶対に上書きしない**。名鑑DBは正本、credit builder上の値は「今回のイベント用の一時出力値」
-- 出力形式: EMN Minimal Credit / Custom Format / Plain Text / Markdown / WordPress HTML / Discord / JSON
-- Custom Formatは安全な文字列置換のみ（eval等は使わない）。未知のプレースホルダーは警告表示
-- 使用可能プレースホルダー: `<name>` `<name_jp>` `<name_en>` `<display_name>` `<canonical_name>` `<role>` `<roles_csv>` `<instrument>`(=role互換) `<link_primary>` `<link_secondary>` `<links_csv>` `<links_lines>` `<x_url>` `<youtube_url>` `<website_url>` `<profile_url>` `<image_url>` `<icon_image_url>` `<credit_html>`
-
-## office people import
-
-officeリポジトリの `knowledge/wordpress/credits/people.json` をWebアプリ用形式に変換する（v0.1はdry-runのみ。実DB insertはv0.2）。
-
-```bash
-npx tsx scripts/import-office-people.ts ../office/knowledge/wordpress/credits/people.json > converted.json
-```
-
-- `display_name` → `displayName` / `nameJp`初期候補
-- `default_role` + `roles_seen` → `roles`（instrumentsは作らない）
-- `icon_url` → `iconImageUrl`、`sns_urls` → `musician_links`、`person_id` → slug候補
-- **`nameEn`は自動推定しない**。全件TODOとして出力し、人間が確定する
-- 変換結果は全件 `visibility: draft`。公開前に人間が確認する
-
-## Vercel deploy手順（ユーザー作業）
-
-1. Vercelで本リポジトリをimport（Framework: Next.js、設定はデフォルトでよい）
-2. 環境変数を設定（上記の表を参照。Production/Preview両方）
-3. Settings → Domains に `musicians.emnrecords.com` を追加
-
-### DNS設定（ConoHa側・ユーザー作業）
-
-ConoHa WINGのDNS設定で、サブドメイン `musicians` のCNAMEレコードを追加:
-
-```text
-musicians.emnrecords.com  CNAME  f5202c022cf44483.vercel-dns-017.com.
-```
-
-（Vercelのドメイン追加画面に表示される値を正とする。`emnrecords.com`本体のWordPress運用には影響しない）
-
-### URL方針
-
-- v0.1: サブドメイン `musicians.emnrecords.com`
-- 将来候補: `emnrecords.com/musicians`（basePath移行を想定し、URLは全て`NEXT_PUBLIC_APP_URL`基準で生成している）
-- `artists.emnrecords.com` は復旧作業中の代替URLとして残してよいが、正本URLにはしない
-
-## セキュリティ上の制約まとめ
-
-- 各種パスワードハッシュ・Supabase secretはserver-only（Vercel環境変数 / wp-config.php）。`NEXT_PUBLIC`を付けない。GitHubにcommitしない
-- **WordPress Application PasswordはNext.js側に持たない**（新構成では不要）
-- download用・upload用・admin用のパスワードは別
-- パスワード照合はserver側（sha256 + timing-safe比較）。Next.js側は成功時にhttpOnly署名cookie（12時間）、WordPress側は都度照合
-- パスワード試行は簡易rate limit（10分10回。Next.js側はインスタンス内メモリ、WordPress側はtransient）
-- アップロードはWordPress server側でMIME / 拡張子 / magic number / サイズを許可リスト検証
-- WordPress endpointのCORSは許可origin限定（ワイルドカード不使用）
-- Supabase metadata保存失敗時はWordPress attachmentを削除（孤児ファイルを残さない）
-- health endpoint（`GET /wp-json/emn-musicians/v1/health`）はpassword hash・Supabase URL・Supabase secret keyのいずれも返さない（`ok` / `plugin` / `version` のみ）
-- members_only素材のfile_urlは公開ページに出さない。ただし上記の通りURL漏洩時は直接アクセス可能
-- `/member/*` `/admin` `/credit-builder` はnoindex + robots.txtでdisallow
-- Custom Formatは正規表現による文字列置換のみ
-
-## 確認コマンド
+## 検証
 
 ```bash
 npm run lint
 npm run build
-npx tsx scripts/import-office-people.ts   # dry-run変換
+npx tsx scripts/import-office-people.ts
 ```
 
-## v0.1の範囲
+`import-office-people.ts` は現在dry-runのみです。`nameEn`を推測せず、人間が確定するための変換結果を出力します。
 
-- 名鑑（検索・role絞り込み・詳細・OGP）
-- クレジット生成（一時編集・並び替え・7形式・copy/download）
-- 立ち絵素材のアップロード / ダウンロード（共通パスワード方式）
-- mock fallback（Supabase未設定でも全画面動作）
-- SQL / importスクリプト（dry-run）
-- 管理画面からのミュージシャン追加
+## Legacy
 
-## v0.2以降のTODO
-
-- Supabase Auth導入（本人編集・承認フロー、templateの本人管理）
-- credit_exports / credit_format_templates のDB保存UI
-- import script の実DB insert
-- 素材の非公開配信（signed URL等）の検討
-- アイコン画像のカスタムアップロード（Supabase Storage / 正方形警告）
-- 管理画面での既存データ編集・削除
-- basePath対応（`emnrecords.com/musicians` 配下への移行オプション）
-- rate limitの永続化（KV等）
-
-## ユーザー側で必要な作業（このリポジトリではやらない）
-
-- 本番DNS変更（ConoHa側CNAME追加）
-- Vercelプロジェクト作成と本番環境変数の実値設定
-- Supabase secret key / DB passwordの入力、SQL実行
-- WordPress pluginの設置・有効化と `wp-config.php` への定数追加（EMN_MUSICIANS_*）
-- ConoHaのPHPアップロード上限確認（upload_max_filesize / post_max_size ≥ 25M）
-- Discordチャンネルへのページ URL・共通パスワードの掲示
+立ち絵配布系コード、WordPress plugin、member用パスワードスコープは方針転換によりリポジトリから削除しました。過去実装はGit履歴でのみ参照します。まだ実データがないため移行SQLは作らず、運用開始前に現行の初期SQLからDBを作り直します。外部サービス上の撤去手順は [docs/operator-setup.md](docs/operator-setup.md) を参照してください。

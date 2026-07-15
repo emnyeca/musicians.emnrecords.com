@@ -4,10 +4,8 @@ import { getPublicSupabaseConfig } from "./client";
 /**
  * Server-side Supabase client.
  *
- * When SUPABASE_SECRET_KEY (service role) is set it is used so that
- * members_only standing assets — which RLS hides from anonymous clients —
- * can be read by password-gated server routes. The secret key must never be
- * exposed to the browser (no NEXT_PUBLIC prefix).
+ * The service-role key is used only by operator-controlled server routes.
+ * It must never be exposed to browsers, Discord interactions, or public logs.
  */
 export function getSupabaseServerClient(): SupabaseClient | null {
   const config = getPublicSupabaseConfig();

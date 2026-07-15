@@ -2,11 +2,7 @@ import type {
   IconImageSource,
   Musician,
   MusicianLink,
-  MusicianSummary,
   MusicianVisibility,
-  StandingAsset,
-  StandingAssetStorageBackend,
-  StandingAssetVisibility,
 } from "@/types/musician";
 
 /** Supabase row shapes (snake_case) and mapping into domain types. */
@@ -41,41 +37,6 @@ export type MusicianRow = {
   visibility: string | null;
   is_verified: boolean | null;
   musician_links?: MusicianLinkRow[] | null;
-};
-
-export type StandingAssetRow = {
-  id: string;
-  musician_id: string;
-  title: string;
-  description: string | null;
-  file_url: string;
-  storage_backend: string | null;
-  wp_media_id: number | null;
-  original_filename: string | null;
-  stored_filename: string | null;
-  mime_type: string | null;
-  file_size_bytes: number | null;
-  visibility: string | null;
-  access_note: string | null;
-  allow_credit_use: boolean | null;
-  allow_thumbnail_use: boolean | null;
-  allow_cropping: boolean | null;
-  allow_color_adjustment: boolean | null;
-  require_credit: boolean | null;
-  credit_text: string | null;
-  usage_terms: string | null;
-  is_active: boolean | null;
-  created_at: string;
-  updated_at: string;
-  musicians?: {
-    id: string;
-    slug: string;
-    display_name: string;
-    name_jp: string;
-    name_en: string;
-    roles: string[] | null;
-    icon_image_url: string | null;
-  } | null;
 };
 
 export function mapMusicianLinkRow(row: MusicianLinkRow): MusicianLink {
@@ -114,46 +75,5 @@ export function mapMusicianRow(row: MusicianRow): Musician {
     visibility: (row.visibility ?? "draft") as MusicianVisibility,
     isVerified: row.is_verified ?? false,
     links,
-  };
-}
-
-export function mapStandingAssetRow(row: StandingAssetRow): StandingAsset {
-  const musician: MusicianSummary | null = row.musicians
-    ? {
-        id: row.musicians.id,
-        slug: row.musicians.slug,
-        displayName: row.musicians.display_name,
-        nameJp: row.musicians.name_jp,
-        nameEn: row.musicians.name_en,
-        roles: row.musicians.roles ?? [],
-        iconImageUrl: row.musicians.icon_image_url,
-      }
-    : null;
-  return {
-    id: row.id,
-    musicianId: row.musician_id,
-    musician,
-    title: row.title,
-    description: row.description,
-    fileUrl: row.file_url,
-    storageBackend: (row.storage_backend ??
-      "wordpress_media") as StandingAssetStorageBackend,
-    wpMediaId: row.wp_media_id,
-    originalFilename: row.original_filename,
-    storedFilename: row.stored_filename,
-    mimeType: row.mime_type,
-    fileSizeBytes: row.file_size_bytes,
-    visibility: (row.visibility ?? "members_only") as StandingAssetVisibility,
-    accessNote: row.access_note,
-    allowCreditUse: row.allow_credit_use ?? true,
-    allowThumbnailUse: row.allow_thumbnail_use ?? true,
-    allowCropping: row.allow_cropping ?? true,
-    allowColorAdjustment: row.allow_color_adjustment ?? false,
-    requireCredit: row.require_credit ?? false,
-    creditText: row.credit_text,
-    usageTerms: row.usage_terms,
-    isActive: row.is_active ?? true,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
   };
 }
