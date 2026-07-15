@@ -136,7 +136,8 @@ create table if not exists musician_audit_logs (
   action text not null check (
     action in (
       'profile_update', 'profile_update_failed', 'lock', 'unlock',
-      'restore', 'representative_set', 'representative_revoked'
+      'restore', 'representative_set', 'representative_revoked',
+      'visibility_change'
     )
   ),
   changed_fields text[] not null default '{}',
