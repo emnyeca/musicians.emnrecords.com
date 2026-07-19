@@ -95,6 +95,8 @@ Discord公式仕様に基づき、次を守る。
 
 この構成を選ぶ理由は、常駐Bot用の別実行環境を増やさず、PING、署名検証、slash command、button、Modal submit、DB transactionを同じserver-only境界に集約でき、初期無料運用と秘密情報管理が単純になるためである。commandやModal表示は3秒以内に同期応答し、確定処理が3秒を超える可能性がある場合はbutton interactionへdeferred responseを返す。
 
+ユーザー単位rate limitは、Vercel/serverlessの各instance内にだけ状態を持つin-memory実装であり、instanceをまたぐ厳密な分散rate limitではない。これは短時間の連続操作を抑えるbest effortと位置づけ、DB側のsession、version、interaction IDによる重複防止を安全境界とする。利用量や攻撃リスクが増え、全instanceで一貫した制限が必要になった場合は、DBまたは外部KVを使う分散rate limitへ移す。
+
 将来Gateway接続や常駐処理が必要になった場合はBotプロセスを分離できる。その場合もBotが持つのは個別に交換できる`INTAKE_API_SECRET`だけとし、`SUPABASE_SECRET_KEY`は受付API側だけに置く。
 
 ## DB正本
@@ -115,13 +117,14 @@ Discord公式仕様に基づき、次を守る。
 - `credit_exports`にも匿名policyを作らない。
 - Discord本人性をSupabase Authへ載せ替えず、署名検証済みのserver routeがservice roleで操作する。
 - service roleはRLSを迂回するため、route内の再認可、項目ホワイトリスト、transaction、監査を必須とする。
+- `sql/003_functions.sql`のmutation RPCは`public`、`anon`、`authenticated`から`execute`をrevokeし、`service_role`だけにgrantする。browserやSupabase clientから直接呼ばず、署名検証・再認可済みのNext.js server routeを必ず経由する。
 
 ## ロックと復旧
 
 - 本人または運営者から申請があった場合、対象レコードだけをロックする。
 - 不審な連続更新、権限不整合、認証情報流出でも対象レコードをロックできる。
 - ロック中は新規session作成と確定を拒否する。
-- ロック解除、代表者変更、過去状態への復旧は運営者だけが行う。
+- ロック解除、代表者変更、過去状態への復旧は運営者だけが行う。運営者は事故対応のためロック中でも復旧でき、復旧後もロック状態を維持する。確認後に必要な場合だけ`/emn-admin profile-unlock`で明示的に解除する。
 - 公開画面から物理削除する機能は作らず、通常は非公開化で対応する。
 - 通常のプロフィール復旧は監査ログの過去状態を新しい変更として反映し、復旧操作も記録する。
 

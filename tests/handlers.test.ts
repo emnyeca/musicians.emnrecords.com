@@ -492,6 +492,18 @@ describe("運営者コマンド(operator再認可)", () => {
     await hide.after?.();
     expect(deps.store.musicians.get(musician.id)!.visibility).toBe("hidden");
 
+    const lock = await handleInteraction(
+      commandInteraction({
+        command: "emn-admin",
+        subcommand: "profile-lock",
+        options: { musician: musician.slug, reason: "復旧作業中" },
+        ...operator,
+      }),
+      deps,
+    );
+    await lock.after?.();
+    expect(deps.store.musicians.get(musician.id)!.isLocked).toBe(true);
+
     const updateLog = deps.store.auditLogs.find(
       (log) => log.action === "profile_update",
     )!;
@@ -518,6 +530,8 @@ describe("運営者コマンド(operator再認可)", () => {
     ).toBe(true);
     // 非公開化はrestoreで巻き戻らない。
     expect(restored.visibility).toBe("hidden");
+    // 運営者restoreはlock中も許可するが、lock解除は別操作にする。
+    expect(restored.isLocked).toBe(true);
   });
 
   it("本人による/emn-profile lockは自分のレコードだけを対象にする", async () => {

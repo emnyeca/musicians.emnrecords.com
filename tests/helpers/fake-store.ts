@@ -423,7 +423,6 @@ export class FakeIntakeStore implements IntakeStore {
   }): Promise<MutationSuccess | StoreError> {
     const musician = this.musicians.get(input.musicianId);
     if (!musician) return { ok: false, errorCode: "musician_not_found" };
-    if (musician.isLocked) return { ok: false, errorCode: "musician_locked" };
     const auditLog = this.auditLogs.find(
       (log) => log.id === input.auditLogId && log.musicianId === input.musicianId,
     );

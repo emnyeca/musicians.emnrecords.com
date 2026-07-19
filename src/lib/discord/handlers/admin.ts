@@ -24,8 +24,6 @@ const ADMIN_ERROR_MESSAGES: Record<string, string> = {
   snapshot_not_restorable:
     "この監査ログはプロフィール全体のsnapshotを含まないため復旧に使えません。",
   invalid_state: "stateは before / after のどちらかにしてください。",
-  musician_locked:
-    "ロック中のレコードは復旧できません。先にロックを解除してください。",
 };
 
 function adminErrorMessage(errorCode: string): string {

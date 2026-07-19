@@ -405,6 +405,7 @@ end;
 $$;
 
 -- 運営者による過去状態への復旧。監査snapshotを新しい変更として反映する。
+-- 事故対応ではlockしたまま復旧できるようにし、lock状態自体は変更しない。
 create or replace function restore_musician_from_audit(
   p_musician_id uuid,
   p_audit_log_id uuid,
@@ -432,9 +433,6 @@ begin
   select * into v_musician from musicians where id = p_musician_id for update;
   if not found then
     return jsonb_build_object('ok', false, 'error_code', 'musician_not_found');
-  end if;
-  if v_musician.is_locked then
-    return jsonb_build_object('ok', false, 'error_code', 'musician_locked');
   end if;
 
   select * into v_audit
@@ -487,3 +485,32 @@ begin
     'slug', v_musician.slug, 'restored_from', p_audit_log_id);
 end;
 $$;
+
+-- 書き込み関数は、署名検証・再認可済みのNext.js server routeから
+-- service roleでだけ実行する。PostgREST経由のclient直接実行を許可しない。
+-- apply_validated_profile_payloadも外部公開用RPCではない内部書き込み関数のため閉じる。
+revoke execute on function apply_validated_profile_payload(uuid, jsonb, jsonb)
+  from public, anon, authenticated;
+revoke execute on function confirm_profile_update_session(uuid, text, text)
+  from public, anon, authenticated;
+revoke execute on function set_musician_lock(uuid, boolean, text, text, text, text)
+  from public, anon, authenticated;
+revoke execute on function set_musician_representative(uuid, text, text, text, text)
+  from public, anon, authenticated;
+revoke execute on function set_musician_visibility(uuid, text, text, text)
+  from public, anon, authenticated;
+revoke execute on function restore_musician_from_audit(uuid, uuid, text, text, text)
+  from public, anon, authenticated;
+
+grant execute on function apply_validated_profile_payload(uuid, jsonb, jsonb)
+  to service_role;
+grant execute on function confirm_profile_update_session(uuid, text, text)
+  to service_role;
+grant execute on function set_musician_lock(uuid, boolean, text, text, text, text)
+  to service_role;
+grant execute on function set_musician_representative(uuid, text, text, text, text)
+  to service_role;
+grant execute on function set_musician_visibility(uuid, text, text, text)
+  to service_role;
+grant execute on function restore_musician_from_audit(uuid, uuid, text, text, text)
+  to service_role;
