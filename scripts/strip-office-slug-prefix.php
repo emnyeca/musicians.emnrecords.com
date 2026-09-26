@@ -43,12 +43,13 @@ function meaningful_slug(array $profile): string {
 
 $apply=in_array('--apply',$argv,true);
 $rows=query("SELECT * FROM musicians WHERE slug LIKE 'office-%' ORDER BY slug")->fetchAll();
+$slugOverrides=['office-person-25e05dabfe7a'=>'chama'];
 $plan=[]; $holds=[]; $targets=[];
 foreach ($rows as $row) {
     $old=(string)$row['slug'];
     $remainder=substr($old,7);
     $profile=json_decode((string)$row['profile'],true,512,JSON_THROW_ON_ERROR);
-    $new=str_starts_with($remainder,'person-') ? meaningful_slug($profile) : $remainder;
+    $new=$slugOverrides[$old] ?? (str_starts_with($remainder,'person-') ? meaningful_slug($profile) : $remainder);
     $name=(string)($profile['display_name'] ?? $profile['name_jp'] ?? $old);
     if ($new === '') {
         $holds[]=[$old,$name,'SNS・Web URLからslugを作れません'];
