@@ -1,0 +1,211 @@
+[
+  {
+    "name": "emn-profile",
+    "description": "自分の公開プロフィールを確認・更新する",
+    "contexts": [
+      0
+    ],
+    "options": [
+      {
+        "type": 1,
+        "name": "edit",
+        "description": "公開プロフィールの更新を開始する"
+      },
+      {
+        "type": 1,
+        "name": "view",
+        "description": "現在の登録内容をephemeralで確認する"
+      },
+      {
+        "type": 1,
+        "name": "confirm",
+        "description": "現在の登録内容を確認済みとして記録する"
+      },
+      {
+        "type": 1,
+        "name": "withdraw",
+        "description": "掲載を辞退して非公開・ロック状態にする",
+        "options": [
+          {
+            "type": 5,
+            "name": "confirm",
+            "description": "掲載辞退を確定する",
+            "required": true
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "lock",
+        "description": "自分のレコードの一時ロックを申請する",
+        "options": [
+          {
+            "type": 3,
+            "name": "reason",
+            "description": "ロック理由(任意)",
+            "required": false,
+            "max_length": 200
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "emn-admin",
+    "description": "運営者専用のプロフィール管理",
+    "contexts": [
+      0
+    ],
+    "default_member_permissions": "0",
+    "options": [
+      {
+        "type": 1,
+        "name": "representative-set",
+        "description": "Discordユーザーとmusicianレコードを代表者として紐づける",
+        "options": [
+          {
+            "type": 6,
+            "name": "user",
+            "description": "代表者にするユーザー",
+            "required": true
+          },
+          {
+            "type": 3,
+            "name": "musician",
+            "description": "対象musicianのslugまたはID",
+            "required": true,
+            "max_length": 100
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "profile-lock",
+        "description": "対象レコードをロックする",
+        "options": [
+          {
+            "type": 3,
+            "name": "musician",
+            "description": "対象musicianのslugまたはID",
+            "required": true,
+            "max_length": 100
+          },
+          {
+            "type": 3,
+            "name": "reason",
+            "description": "ロック理由(任意)",
+            "required": false,
+            "max_length": 200
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "profile-unlock",
+        "description": "対象レコードのロックを解除する",
+        "options": [
+          {
+            "type": 3,
+            "name": "musician",
+            "description": "対象musicianのslugまたはID",
+            "required": true,
+            "max_length": 100
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "profile-hide",
+        "description": "対象レコードを非公開化する",
+        "options": [
+          {
+            "type": 3,
+            "name": "musician",
+            "description": "対象musicianのslugまたはID",
+            "required": true,
+            "max_length": 100
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "profile-show",
+        "description": "対象レコードを公開状態へ戻す",
+        "options": [
+          {
+            "type": 3,
+            "name": "musician",
+            "description": "対象musicianのslugまたはID",
+            "required": true,
+            "max_length": 100
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "profile-restore",
+        "description": "監査ログの過去状態へ復旧する(新しい変更として記録)",
+        "options": [
+          {
+            "type": 3,
+            "name": "musician",
+            "description": "対象musicianのslugまたはID",
+            "required": true,
+            "max_length": 100
+          },
+          {
+            "type": 3,
+            "name": "audit_log",
+            "description": "監査ログID(/emn-admin audit-list で確認)",
+            "required": true,
+            "max_length": 36
+          },
+          {
+            "type": 3,
+            "name": "state",
+            "description": "before=その変更の直前 / after=その変更の直後(既定)",
+            "required": false,
+            "choices": [
+              {
+                "name": "after",
+                "value": "after"
+              },
+              {
+                "name": "before",
+                "value": "before"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "audit-list",
+        "description": "対象レコードの直近の監査ログIDを確認する",
+        "options": [
+          {
+            "type": 3,
+            "name": "musician",
+            "description": "対象musicianのslugまたはID",
+            "required": true,
+            "max_length": 100
+          }
+        ]
+      },
+      {
+        "type": 1,
+        "name": "representative-revoke",
+        "description": "代表者の登録を失効する",
+        "options": [
+          {
+            "type": 3,
+            "name": "musician",
+            "description": "対象musicianのslugまたはID",
+            "required": true,
+            "max_length": 100
+          }
+        ]
+      }
+    ]
+  }
+]

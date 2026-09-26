@@ -2,7 +2,7 @@
  * Domain types for the EMN Records Musician Directory & Credit Builder.
  *
  * Naming policy:
- * - DB (Supabase) uses snake_case, app code uses camelCase.
+ * - DB (MySQL) uses snake_case, app code uses camelCase.
  * - "roles" is the single field for what a person does (instrument / role are
  *   NOT separated in this app). There is no `instruments` field by design.
  */
@@ -11,7 +11,6 @@ export type MusicianVisibility = "public" | "draft" | "hidden";
 
 export type IconImageSource =
   | "external_url"
-  | "supabase_upload"
   | "conoha_url"
   | "none";
 
@@ -42,7 +41,7 @@ export type Musician = {
   roles: string[];
   primarySnsUrl: string | null;
   websiteUrl: string | null;
-  /** Square icon image URL (X profile icon, ConoHa URL, Supabase URL, ...). */
+  /** Square icon image URL (X profile icon, ConoHa URL, ...). */
   iconImageUrl: string | null;
   iconImageSource: IconImageSource;
   iconStoragePath: string | null;

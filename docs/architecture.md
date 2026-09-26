@@ -39,6 +39,19 @@ Discord公式仕様に基づき、次を守る。
 
 「即時反映」とはModal送信直後の反映ではない。本人がephemeral previewで内容を確認し、`[反映する]`を押した後、運営者の事前承認を挟まずに反映することを指す。
 
+## 初回移行と一括公開
+
+Officeの共演履歴から得た人物情報は公開情報の完成版とはみなさず、すべて`draft`として取り込む。初回公開は次の順序で行う。
+
+1. Officeの人物情報を重複させずに下書きとして取り込む。
+2. 運営者が名前、英語名、役割、SNS、画像を確認する。
+3. 運営者がDiscordユーザーとmusicianレコードを代表者として紐づける。
+4. Discordで確認方法と確認期日を告知する。
+5. 本人が自分の情報だけを確認・修正し、掲載を望まない場合は掲載辞退を申請する。
+6. 確認期日時点で掲載辞退、未確認で判断を保留した対象、必須項目が不十分な対象を除き、運営者が一括公開する。
+
+掲載辞退は監査と誤操作からの復旧を可能にするため物理削除にしない。対象を非公開かつロック状態にし、一括公開の対象から除外する。法令・契約などに基づく完全削除が必要な場合は、通常の本人操作とは分けて運営者が対応する。
+
 ## 本人項目と運営項目
 
 本人が変更できる項目は次に限定する。
@@ -73,14 +86,17 @@ Discord公式仕様に基づき、次を守る。
 - 一般閲覧者: `visibility = 'public'`のミュージシャンと公開リンクだけを読む。
 - 代表者: 自分に紐づいた1レコードの公開プロフィールをpreview確認後に更新し、自分のレコードをロック申請できる。
 - 運営者: 代表者の設定・失効、対象レコードのロック・解除、非公開化、復旧を行う。
-- DB書き込み処理: 信頼されたNext.js server routeだけがservice roleで実行する。ブラウザ、Discord interaction payload、通知、ログへservice-role keyを渡さない。
+- DB書き込み処理: 信頼されたPHP APIだけがMySQLへ接続する。DB接続情報・管理パスワード・Discord tokenをブラウザ、interaction payload、通知、ログへ渡さない。
 
 初期コマンドは次のとおりとする。
 
 - `/emn-profile edit`: 自分の公開プロフィール更新を開始する。
 - `/emn-profile view`: 現在の登録情報をephemeralで確認する。
+- `/emn-profile confirm`: 修正がない場合も現在の登録内容を確認済みとして記録する。
+- `/emn-profile withdraw`: 本人が掲載を辞退し、レコードを非公開・ロック状態にする。
 - `/emn-profile lock`: 自分のレコードの一時ロックを申請する。
 - `/emn-admin representative-set`: 運営者がDiscord user IDとmusician IDを紐づける。
+- `/emn-admin representative-revoke`: 運営者が現在の代表者を失効する。
 - `/emn-admin profile-lock`: 運営者が対象レコードをロックする。
 - `/emn-admin profile-unlock`: 運営者がロックを解除する。
 - `/emn-admin profile-hide` / `profile-show`: 運営者が対象レコードを非公開化・再公開する。
@@ -89,35 +105,45 @@ Discord公式仕様に基づき、次を守る。
 
 運営者コマンドはDiscord側で利用者を絞ったうえで、API側でも`DISCORD_OPERATOR_ROLE_ID`を操作時点で再確認する。ユニットやデュオも初期運用では有効な代表者を1名にする。
 
-## API構成の判断
+## 配信とAPI構成
 
-初期実装は、Vercel上のNext.js Route Handler `/api/discord/interactions`をDiscordのHTTP Interactions Endpointとして使う。
+外部サービスごとの認証・維持管理を減らし、既存契約のConoHa WINGへ集約する。
+静的ビルドしたNext.jsの画面とPHP APIを `musicians.emnrecords.com` へ置き、MySQLを正本とする。
+Node.jsはビルド時だけ使用する。Next.js server、Vercel、Supabase、常駐Botを運用条件にしない。
 
-この構成を選ぶ理由は、常駐Bot用の別実行環境を増やさず、PING、署名検証、slash command、button、Modal submit、DB transactionを同じserver-only境界に集約でき、初期無料運用と秘密情報管理が単純になるためである。commandやModal表示は3秒以内に同期応答し、確定処理が3秒を超える可能性がある場合はbutton interactionへdeferred responseを返す。
+一覧・検索・Credit作成の画面は公開APIから最新のプロフィールを取得する。
+`/musicians/{slug}` はPHPが公開状態を確認し、共通の詳細画面にtitle・OGPを付けて返す。
+存在しないレコードと非公開レコードは404。プロフィール更新時の再ビルドは不要。
+静的ページに実データや秘密情報を埋め込まない。API障害を空の名鑑やmock表示で隠さない。
 
-ユーザー単位rate limitは、Vercel/serverlessの各instance内にだけ状態を持つin-memory実装であり、instanceをまたぐ厳密な分散rate limitではない。これは短時間の連続操作を抑えるbest effortと位置づけ、DB側のsession、version、interaction IDによる重複防止を安全境界とする。利用量や攻撃リスクが増え、全instanceで一貫した制限が必要になった場合は、DBまたは外部KVを使う分散rate limitへ移す。
+Discord受付は `/api/discord/interactions`。署名とtimestampを検証したraw bodyだけを扱う。
+Modalを開く操作は同期応答し、ほかはDB処理前にdeferする。
+LSAPI/FPMではHTTP応答を終了して処理を継続する。それ以外の実行環境ではDiscord callback APIで先に応答する。
+通知の失敗はDBの確定を取り消さない。通知欠落時は監査ログで確認する。
 
-将来Gateway接続や常駐処理が必要になった場合はBotプロセスを分離できる。その場合もBotが持つのは個別に交換できる`INTAKE_API_SECRET`だけとし、`SUPABASE_SECRET_KEY`は受付API側だけに置く。
+運営Web画面はパスワードのhash検証と1時間のサーバーsessionで保護する。
+HttpOnly・SameSite=Strict cookie、本番HTTPSでSecure、書き込み時のOrigin照合を用いる。
+ログイン試行とDiscord操作のrate limitはMySQLへ保存し、PHPプロセス間で共有する。
 
-## DB正本
+## DB正本とアクセス境界
 
-実データがないため、`sql/001_init.sql`と`sql/002_rls.sql`を作り直し用の正本とする。
+`sql/schema.sql` を新規DB用の正本とする。
 
-- `musicians`: `version`、`is_locked`、`locked_at`、`locked_reason`を持つ。
-- `musician_representatives`: Discord user IDとmusician recordの代表者関係を管理し、部分unique indexで有効な代表者を1名にする。
-- `profile_update_sessions`: Modal submit後、確定前の短命draft、提出値、検証済み値、基準version、有効期限、消費状態を持つ。`discord_interaction_id`と`session_id`をuniqueにする。
-- `musician_audit_logs`: 通常更新、失敗、ロック、解除、復旧、代表者変更を記録する。`interaction_id`をuniqueにし、triggerでupdateとdeleteを拒否する。
+- `musicians`: ID、slug、公開状態、version、lockを通常columnで管理し、プロフィール項目と公開リンクを `profile` JSONへまとめる。
+- `musician_representatives`: 現在の代表者だけを管理する。musician IDとDiscord user IDをそれぞれuniqueにし、変更履歴は監査へ残す。
+- `profile_update_sessions`: 提出値・検証済みpayload・基準version・10分の有効期限・消費状態を保持する。
+- `musician_audit_logs`: 作成、本人更新、失敗、lock、公開状態、復旧、代表者変更の追記専用履歴。update/deleteをtriggerで拒否する。
+- `rate_limits`: 短期の操作回数。期限切れは通常アクセス時に掃除する。
 
-`profile_update_sessions`の確定は、未使用sessionの消費、`base_version`と現在versionの一致、lock確認、プロフィール更新、version加算、監査ログ追加を1つのtransactionで行う。二重confirmは最初の1回だけが成功する。
+プロフィール更新・version加算・session消費・監査追加は同一InnoDB transactionで行う。
+同じmusicianへの書き込みは行lockで直列化し、interaction IDのunique制約で二重反映を防ぐ。
+preview修正時の旧session失効と新session作成も同一transactionとする。
+運営者による変更はversionを更新し、未確定previewを失効する。復旧でもversionを巻き戻さない。
 
-## RLS
-
-- 匿名クライアントはpublic musiciansと、その公開リンクだけをselectできる。
-- `musician_representatives`、`profile_update_sessions`、`musician_audit_logs`にはclient向けpolicyを作らない。
-- `credit_exports`にも匿名policyを作らない。
-- Discord本人性をSupabase Authへ載せ替えず、署名検証済みのserver routeがservice roleで操作する。
-- service roleはRLSを迂回するため、route内の再認可、項目ホワイトリスト、transaction、監査を必須とする。
-- `sql/003_functions.sql`のmutation RPCは`public`、`anon`、`authenticated`から`execute`をrevokeし、`service_role`だけにgrantする。browserやSupabase clientから直接呼ばず、署名検証・再認可済みのNext.js server routeを必ず経由する。
+DBに公開接続口は設けず、PHPの公開APIはpublic recordと公開リンクだけを明示的な項目で返す。
+代表者・session・監査・lock詳細を公開レスポンスに含めない。
+自己編集の許可項目・型・長さ・URL形式は提出時と確定時の両方で検証する。
+DBの認証情報とPHP実装は `public_html` の外に配置する。
 
 ## ロックと復旧
 
@@ -130,10 +156,10 @@ Discord公式仕様に基づき、次を守る。
 
 ## バックアップ
 
-- 初期運用では金銭的コストを増やさず、Supabase Freeに自動バックアップがあると仮定しない。利用時点のFreeとProの仕様は確認するが、未確認の無料プラン仕様を前提にしない。
-- 初期の復旧方針は、追記専用監査ログと、プロジェクト外へ暗号化して保存する論理バックアップで成立させる。
-- 論理バックアップは最低2箇所へ保存し、検証用DBまたはローカルDBへ定期的に復元する。
-- Supabase Proの日次バックアップやPITRは初期運用の必須条件にしない。データ量、利用頻度、責任範囲が増えた場合の将来選択肢とする。
+ConoHaの既存バックアップと、プロジェクト外へ保存する暗号化したMySQL論理バックアップを利用する。
+監査ログによる個別復旧と、DB全体の障害復旧を区別する。
+バックアップを取得したことだけで復旧可能と判断せず、別DBへの復元で確認する。
+追加の有料サービスを必須にしない。手順は `backup-restore.md` にまとめる。
 
 ## テスト方針
 
@@ -148,7 +174,7 @@ Interaction受付実装では、少なくとも次を自動テストする。
 - 古い`base_version`を拒否する。
 - 監査ログ追加に失敗した場合、プロフィール更新とsession消費もrollbackする。
 - 運営者コマンドはAPI側でもoperator roleを再確認する。
-- browser bundle、interaction response、通知、ログにservice-role keyが露出しない。
+- browser bundle、interaction response、通知、ログにDBパスワード・Discord tokenが露出しない。
 
 ## Legacy
 

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import type { Musician } from "@/types/musician";
 import { IconImage } from "@/components/icon-image";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -51,15 +50,11 @@ export function MusicianCard({
               {displayUrl(primaryLink)}
             </span>
           ) : (
-            <a
-              href={primaryLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
+            <span
               className="truncate text-[11px] text-muted/80 hover:text-accent-strong hover:underline"
             >
               {displayUrl(primaryLink)}
-            </a>
+            </span>
           )
         ) : (
           <span className="min-h-4" />
@@ -89,8 +84,8 @@ export function MusicianCard({
   }
 
   return (
-    <Link href={`/musicians/${musician.slug}`} className={cardClass}>
+    <a href={`/musicians/${musician.slug}`} className={cardClass}>
       {body}
-    </Link>
+    </a>
   );
 }

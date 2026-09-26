@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { MusicianDirectory } from "@/components/musician-grid";
-import { getPublicMusicians } from "@/lib/data/musicians";
+import { LiveDirectory } from "@/components/live-directory";
 
 export const metadata: Metadata = {
   title: "Musicians",
@@ -8,10 +7,8 @@ export const metadata: Metadata = {
     "Virtual musicians around EMN Records — roles, links and profiles.",
 };
 
-export const revalidate = 300;
 
-export default async function MusiciansPage() {
-  const musicians = await getPublicMusicians();
+export default function MusiciansPage() {
 
   return (
     <div className="flex flex-col gap-6">
@@ -21,7 +18,7 @@ export default async function MusiciansPage() {
           EMN Recordsに関わるバーチャルミュージシャンの名鑑
         </p>
       </div>
-      <MusicianDirectory musicians={musicians} />
+      <LiveDirectory />
     </div>
   );
 }
