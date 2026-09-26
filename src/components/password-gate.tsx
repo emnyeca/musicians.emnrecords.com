@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import { Lock, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +21,6 @@ export function PasswordGate({
   description: string;
   footer?: string;
 }) {
-  const router = useRouter();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -39,7 +37,7 @@ export function PasswordGate({
       });
       const body = (await response.json()) as { ok: boolean; error?: string };
       if (body.ok) {
-        router.refresh();
+        window.location.reload();
         return;
       }
       setError(body.error ?? "認証に失敗しました。");
@@ -87,7 +85,6 @@ export function PasswordGate({
 
 /** Clears the access cookie for the given endpoint and refreshes the page. */
 export function AccessLogoutButton({ endpoint }: { endpoint: string }) {
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
 
   async function logout() {
@@ -95,7 +92,7 @@ export function AccessLogoutButton({ endpoint }: { endpoint: string }) {
     try {
       await fetch(endpoint, { method: "DELETE" });
     } finally {
-      router.refresh();
+      window.location.reload();
     }
   }
 

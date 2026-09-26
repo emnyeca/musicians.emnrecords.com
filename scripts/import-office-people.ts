@@ -147,7 +147,7 @@ function main() {
   console.error(`icon未設定: ${noIcon}`);
   console.error(`roles未設定: ${noRoles}`);
   console.error(`visibilityは全件 'draft'。公開前に人間が確認してください。`);
-  console.error(`TODO: Supabaseへの実insertはv0.2で実装（現状はdry-runのみ）`);
+  console.error(`確認用の変換結果です。実DBには書き込みません。`);
 }
 
 main();

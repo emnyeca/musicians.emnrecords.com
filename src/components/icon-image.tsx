@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils/cn";
  * Square icon image with initials fallback.
  *
  * Icon URLs are arbitrary external URLs (X profile icons, ConoHa/WordPress,
- * Supabase Storage, ...), so a plain <img> is used instead of next/image to
+ * ConoHa, ...), so a plain <img> is used instead of next/image to
  * avoid remotePatterns maintenance. object-fit: cover keeps non-square
  * images inside a square frame; onError falls back to initials.
  */

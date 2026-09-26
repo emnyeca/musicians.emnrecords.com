@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type FormEvent, type ReactNode } from "react";
-import Link from "next/link";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -158,12 +157,12 @@ export function AdminMusicianCreateForm({
         result.ok ? (
           <p className="text-sm text-muted">
             作成しました:{" "}
-            <Link
+            <a
               href={result.musician.url}
               className="text-ink underline-offset-2 hover:underline"
             >
               {result.musician.slug}
-            </Link>
+            </a>
           </p>
         ) : (
           <p className="text-sm text-red-600">{result.error}</p>

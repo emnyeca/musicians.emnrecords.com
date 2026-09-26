@@ -1,0 +1,45 @@
+services:
+  db-test:
+    image: mysql:8.4
+    profiles: [test]
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+      MYSQL_DATABASE: musicians_test
+      MYSQL_USER: musicians
+      MYSQL_PASSWORD: local-test-only
+    tmpfs: [/var/lib/mysql]
+    volumes:
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 --protocol=TCP --silent"]
+      interval: 3s
+      retries: 40
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+      MYSQL_DATABASE: musicians
+      MYSQL_USER: musicians
+      MYSQL_PASSWORD: local-development-only
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 --protocol=TCP --silent"]
+      interval: 3s
+      retries: 40
+  web:
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile
+    working_dir: /app
+    command: php -S 0.0.0.0:8080 -t out scripts/router.php
+    ports: ["127.0.0.1:8080:8080"]
+    environment:
+      MUSICIANS_CONFIG: /app/.local/config.php
+    volumes: [".:/app"]
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  mysql-data:

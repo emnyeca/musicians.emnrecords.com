@@ -6,7 +6,7 @@
 export function getAppUrl(): string {
   const url = process.env.NEXT_PUBLIC_APP_URL?.trim();
   if (url && url.length > 0) return url.replace(/\/+$/, "");
-  return "http://localhost:3000";
+  return "https://musicians.emnrecords.com";
 }
 
 export function musicianProfileUrl(slug: string, baseUrl?: string): string {

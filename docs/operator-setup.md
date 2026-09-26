@@ -1,75 +1,109 @@
-# 運営者が行う初期設定
+# 設置と運用
 
-この文書は、Emnyecaによる外部サービス上の操作だけをまとめる。秘密情報をIssue、Discord、作業報告へ貼らないこと。
+## ローカル
 
-## 旧構成の撤去
+Node.jsとDocker Desktopで `npm ci` → `npm run local:setup` → `npm run dev`。
+http://127.0.0.1:8080/admin/ のパスワードは `.local/admin-password.txt`。
+初期DBは空。テストは `npm test` で別の `db-test` コンテナへ実行し、開発DBへは接続しない。
+Dockerは開発用であり、WINGには不要。
+PHP 8.3以降を直接使う場合は、pdo_mysql・mbstring・sodium・curlを有効にし、
+`MUSICIANS_CONFIG` にローカルconfigの絶対パスを指定して `npm start`。
 
-まだ実データがないため、旧DBを部分的に変更せず、運用開始前に現行の初期SQLから作り直す。
+## 公開候補の作成
 
-1. WordPress管理画面で`EMN Musicians Assets`を無効化して削除する。
-2. `wp-config.php`から、この機能専用の`EMN_MUSICIANS_*`定数を削除する。
-3. この機能専用に発行した認証情報があれば失効させる。
-4. VercelのProductionとPreviewから次の環境変数を削除する。
-   - `NEXT_PUBLIC_WORDPRESS_ASSET_UPLOAD_ENDPOINT`
-   - `MEMBER_DOWNLOAD_PASSWORD_HASH`
-   - `MEMBER_DOWNLOAD_PASSWORD`
-   - `ASSET_UPLOAD_PASSWORD_HASH`
-   - `ASSET_UPLOAD_PASSWORD`
-5. Supabaseの現在のプロジェクトに残すべき実データがないことを確認する。
-6. DBを作り直し、`sql/001_init.sql`、`sql/002_rls.sql`、`sql/003_functions.sql`の順に実行する。
-7. デプロイ後、旧`/member/*`と立ち絵APIが404になり、`/`、`/musicians`、`/credit-builder`、`/admin`が動くことを確認する。
+`npm run check` 後に `npm run release:prepare`。
+`build/release-日時/` にpublic・musicians-private・schema.sql・scripts・手順を生成する。
+これはローカルファイル作成だけで、外部へのアップロードもDiscordへの送信もしない。
 
-## Discord Interaction受付の準備
+## ConoHa WINGの初期設定
 
-1. Discord Developer PortalでApplicationを作成する。限定監査チャンネルへの投稿にBot userが必要な場合だけBotも有効にし、Administrator権限は与えない。
-2. Applicationを`applications.commands`と必要最小限の権限だけでEMN Recordsサーバーへ追加する。コマンドはglobalではなくguild commandとして登録する。
-3. 登録対象のメンバーロール、運営者ロール、限定監査チャンネルを決め、それぞれのIDを控える。
-4. `npx tsx scripts/register-discord-commands.ts` でguild commandを登録する(`DISCORD_APPLICATION_ID`、`DISCORD_BOT_TOKEN`、`DISCORD_GUILD_ID`が必要)。`/emn-admin`はDiscordのIntegration設定で運営者ロールだけに許可する。これは補助であり、APIも毎回operator roleを再確認する。
-5. Vercelへ`/api/discord/interactions`をデプロイした後、そのURLをDeveloper PortalのInteractions Endpoint URLへ設定する。PING応答と署名検証は実装済みのため、環境変数を設定してからデプロイすれば検証が通る。
-6. `.env.example`に記載されたapplication public key、guild ID、member/operator role IDなどをVercelへ設定する。`SUPABASE_SECRET_KEY`はNext.jsのserver-only環境変数とし、browserやDiscord responseへ出さない。
-7. 将来Botプロセスを分離する場合、Botには`INTAKE_API_SECRET`だけを設定し、`SUPABASE_SECRET_KEY`は設定しない。
-8. Bot token、受付API認証情報、DB認証情報がログ、チャット、commitへ出た場合は直ちに交換する(手順は [incident-response.md](incident-response.md))。
+公開先は `musicians.emnrecords.com`。既存のホームページとは公開ディレクトリ・DBを分ける。
 
-## Discord実機確認
+1. ConoHaでサブドメインと無料SSLを設定し、PHP 8.3以降を選ぶ。
+2. 専用MySQL DBとユーザーを作り、そのDBへ `schema.sql` を適用する。既存サイトのDBには適用しない。
+3. `musicians-private/` を `public_html` と同じ階層へ配置する。
+4. `config.example.php` を同じフォルダの `config.php` へコピーして、DB接続先とDiscord設定を入れる。
+5. 管理パスワードは `password_hash` でhash化して `admin_password_hash` へ保存する。実行例はconfig.example.phpに記載。
+6. 本人が公開を確認した後、`public/` の中身をサブドメインのdocument rootへ配置する。`.htaccess` を含める。
 
-検証用の代表者とミュージシャンレコードを使い、実際のDiscord clientから次を順に確認する。自動テストだけで運用開始可とはしない。
+標準配置は次のとおり。
 
-1. `npx tsx scripts/register-discord-commands.ts`の実行後、対象guildだけに`/emn-profile`と`/emn-admin`が登録されている。
-2. 代表者が`/emn-profile edit`を実行すると基本プロフィールModalが表示される。
-3. Modal submit後、正本DBはまだ更新されず、入力内容を含むephemeral previewと各buttonが表示される。
-4. previewの`[修正する]`から再びModalが表示される。
-5. 再Modal submit後、同じpreview messageが新しい入力内容へ更新され、`[反映する]`などのbuttonが引き続き操作できる。ここでは、message componentから開いたModalの`MODAL_SUBMIT`に対する`UPDATE_MESSAGE`相当の応答が実Discordで成立することを重点確認する。
-6. `[反映する]`を押すと`musicians`と公開リンクが更新される。
-7. 同じtransactionで`musician_audit_logs`に`profile_update`が記録される。
-8. DB監査のcommit後、限定監査チャンネルへ通知が送られる。通知失敗を再現できる場合は、DB更新と監査ログが失われないことも確認する。
-9. 対象を`/emn-admin profile-lock`でロックすると本人更新は拒否される一方、`/emn-admin profile-restore`は成功し、復旧後もlockが維持される。確認後に必要な場合だけ`/emn-admin profile-unlock`で解除する。
+```text
+/home/ACCOUNT/
+  musicians-private/
+    config.php
+    bootstrap.php / profile.php / store.php / discord.php / http.php
+  public_html/
+    musicians.emnrecords.com/
+      index.html / _next/ / api/index.php / .htaccess / ...
+```
 
-[Discord公式仕様](https://docs.discord.com/developers/interactions/receiving-and-responding)では`UPDATE_MESSAGE`はcomponent由来のinteractionに限られ、componentから開いたModalのsubmitには元messageが含まれる。実機で手順5が通らない場合は、`submitSessionRevision`の応答を新しい`CHANNEL_MESSAGE_WITH_SOURCE`のephemeral previewへ切り替える。新sessionを有効、旧sessionを失効済みとする現在のDB処理は維持し、旧previewのbuttonが押された場合は「処理済み」と返す。これによりpreviewが一時的に2件見えても、有効な確定経路は新previewだけになる。切替後は手順3〜8を再確認する。
+実際のdocument rootが異なる場合は `public/api/index.php` のruntime解決先を合わせる。
+公開ディレクトリにはconfig・SQL・バックアップ・開発用ファイルを置かない。
+configの権限は所有者だけが読み書きできる設定を基本とする。
 
-## DBと復旧手段の準備
+## 実サーバーでの確認
 
-1. 開発・検証用のSupabaseプロジェクトを本番とは別に用意する。
-2. 初期運用では有料プランを前提にせず、利用時点のSupabase FreeとProのバックアップ機能・保存期間を確認する。Supabase Freeに自動バックアップがあるとは仮定しない。
-3. `scripts/backup/backup-db.ps1`(Windows)または`scripts/backup/backup-db.sh`で暗号化論理バックアップを作成する。詳細は [backup-restore.md](backup-restore.md) を参照する。
-4. 論理バックアップは週1回、または大きな登録・更新の前後に作成する。
-5. dumpまたはJSON exportを暗号化し、Supabaseプロジェクト外の最低2箇所へ保存する。初期の保存先はローカルPCと、外部ストレージまたはクラウドストレージの組み合わせを基準にする。
-6. バックアップを公開GitHubリポジトリへ置かない。privateリポジトリへ保存する場合も必ず暗号化する。DB接続文字列、パスワード、復号鍵はリポジトリへ保存しない。
-7. 月1回、バックアップを検証用DBまたはローカルDBへ復元し、手順、結果、所要時間を記録する。
-8. 本番DBへ直接復元する前に、必ず検証用DBまたはローカルDBで内容と復元結果を確認する。
-9. 通常のプロフィール復旧にはDB全体のrestoreを使わず、監査ログの過去状態を新しい変更として反映する。DB全体のrestoreは、通常操作で復旧できない障害に限定する。
-10. 登録、更新、ロック、ロック解除、過去状態への復旧を検証用環境で確認してから本番運用を開始する。
+PHP・DB機能は契約環境に依存するため、ローカル成功とWINGでの検証を区別する。
+公開候補の `scripts/` はpublic_html外で `musicians-private/` と同じ親ディレクトリへ配置し、
+`php scripts/preflight.php` を実行する。PHPバージョン、拡張、DB、監査trigger、設定の有無だけを表示し、秘密値は表示しない。
+CLIのPHPが古い場合はConoHaが案内するPHP 8.3以降の実行パスを指定する。
 
-Supabase Proの日次バックアップやPITRは初期運用には必須としない。データ量、利用頻度、運営が負う責任範囲が増えた場合に、復旧時間と許容できるデータ損失量を見直したうえで将来選択肢として検討する。
+- MySQL 8.4でローカル検証。SQLは5.7以降の構文を使うが、旧契約の5.7は実機未検証。
+- trigger作成権限とbinary log設定はWING実機で確認する。監査triggerが作れない場合、黙って省略して公開しない。
+- Web用PHPでもsodium・curl・mbstring・pdo_mysqlが利用できることを確認する。
+- HTTPSで署名不正が401、署名付きPINGがPONGになることを確認する。
+- WAFがDiscordの正当なPOSTを拒否する場合、対象URLのルールだけを調整する。
+- APIとプロフィールHTMLにキャッシュを適用しない。WEXAL/CDN等を使う場合も動的URLを除外する。
 
-## 運用開始の確認基準
+## Discord
 
-- 対象ロールを持たないユーザーは入力を開始・送信できない。
-- 本人は許可された公開プロフィール項目だけを変更できる。
-- Modal submitだけでは正本DBが更新されない。
-- ephemeral previewで本人が`[反映する]`を押した後、運営者の承認待ちなしで即時反映される。
-- DB更新と監査ログが必ず同時に成立する。
-- 同じDiscord interactionを再送しても二重更新されない。
-- 本人または運営者の申請で対象レコードをロックできる。
-- ロックされたレコードは本人から更新できない。
-- 運営者はロック中のレコードを監査ログから復旧でき、復旧後もロック状態が維持される。
-- 過去状態への復旧も新しい監査記録として残る。
+configの `discord_application_id`、`discord_public_key`、`discord_guild_id`、
+`discord_member_role_id`、`discord_operator_role_id`、`discord_bot_token`、`discord_audit_channel_id` を設定する。
+Botを対象guildへ追加し、限定監査チャンネルだけに必要な閲覧・送信権限を付ける。
+
+`php scripts/register-discord-commands.php` は定義確認のみ。
+対象guildと内容を確認した後に `--apply` を付けて登録する。global commandは登録しない。
+`/emn-admin` はDiscordのIntegration設定でも運営者ロールへ制限する。
+Developer PortalのInteractions Endpoint URLは
+`https://musicians.emnrecords.com/api/discord/interactions`。
+
+## Office人物データの初回移行
+
+`office/knowledge/wordpress/credits/people.json` をサーバーの非公開領域へ置き、まずdry-runする。
+
+```bash
+php scripts/import-office-drafts.php /非公開パス/people.json
+```
+
+件数、`ADD`、`SKIP`を確認した後だけ`--apply`を付ける。Office由来のslugは安定した`office-{person_id}`とし、`source_office_person_id`でも再実行時の重複を防ぐ。既存行は上書きせず、追加分だけを`draft`で作る。
+
+```bash
+php scripts/import-office-drafts.php /非公開パス/people.json --apply
+```
+
+本人確認は`/emn-profile confirm`または本人によるプロフィール更新で記録する。掲載辞退は`/emn-profile withdraw confirm:true`で非公開・ロック状態にする。
+
+告知した確認期日の後、一括公開候補をdry-runで確認する。
+
+```bash
+php scripts/publish-confirmed-drafts.php
+```
+
+代表者が設定済みで、本人確認後に変更されておらず、未ロックで、表示名・日本語名・英語名・役割が揃う下書きだけが`READY`になる。`HOLD`の理由を確認し、公開対象が正しい場合だけ次を実行する。
+
+```bash
+php scripts/publish-confirmed-drafts.php --apply
+```
+
+`/admin/` でレコードを作り、`/emn-admin representative-set` で代表者を割り当てる。
+`/emn-profile edit` → Modal送信 → preview → 修正／任意項目／リンク → 反映を実機で確認する。
+確定前には名鑑が変わらず、確定後には再ビルドなしで変わること、二度押しで二重反映しないことを確認する。
+lock中の拒否、非公開化、監査ログからの復旧、通知も確認する。
+Modal表示の同期応答とdeferがDiscordの3秒制限内であることは本番相当環境で測定する。
+
+## 更新
+
+画面/PHPの変更は公開候補を作り、本人レビュー後にアップロードする。
+プロフィールの通常変更には再ビルド・デプロイ・PCの常時起動は不要。
+初期SQLを更新のたびに再実行しない。DBの内容とconfigはコード配布で上書きしない。

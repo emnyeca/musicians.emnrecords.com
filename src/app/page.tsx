@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { getPublicMusicians } from "@/lib/data/musicians";
+import { MusicianCount } from "@/components/live-directory";
 
-export default async function HomePage() {
-  const musicians = await getPublicMusicians();
+export default function HomePage() {
 
   return (
     <div className="flex flex-col items-center gap-8 py-16 text-center sm:py-24">
@@ -24,7 +23,7 @@ export default async function HomePage() {
       >
         Browse musicians
       </Link>
-      <p className="text-xs text-muted">{musicians.length} musicians listed</p>
+      <MusicianCount />
     </div>
   );
 }
