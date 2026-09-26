@@ -174,7 +174,7 @@ function create_musician(array $input): array {
 
 function update_musician(string $key, array $input): array {
     $mapping=['displayName'=>'display_name','nameJp'=>'name_jp','nameEn'=>'name_en','roles'=>'roles','primarySnsUrl'=>'primary_sns_url','websiteUrl'=>'website_url','iconImageUrl'=>'icon_image_url','vrcName'=>'vrc_name','aliases'=>'aliases'];
-    $allowed=array_merge(array_keys($mapping),['canonicalName','sortName','discordName','visibility','isVerified','links','version']);
+    $allowed=array_merge(array_keys($mapping),['canonicalName','sortName','discordName','visibility','isVerified','links','version','representativeDiscordUserId']);
     if (array_diff(array_keys($input),$allowed)) throw new RequestError('unknown_field');
     if (!is_int($input['version'] ?? null) || !is_bool($input['isVerified'] ?? null)) throw new RequestError('invalid_input');
     $visibility=$input['visibility'] ?? '';
@@ -182,6 +182,8 @@ function update_musician(string $key, array $input): array {
     return transaction(function() use ($key,$input,$mapping,$visibility) {
         $m=musician($key,true);
         if ((int)$m['version']!==$input['version']) throw new RequestError('version_conflict',409);
+        $representative=text_value($input['representativeDiscordUserId'] ?? '',20);
+        if ($representative!=='' && !preg_match('/^\d{17,20}$/D',$representative)) throw new RequestError('invalid_input');
         $fields=[]; foreach ($mapping as $camel=>$snake) $fields[$snake]=$input[$camel] ?? '';
         $fields=validate_fields($fields);
         foreach (['canonicalName'=>'canonical_name','sortName'=>'sort_name','discordName'=>'discord_name'] as $camel=>$snake) $fields[$snake]=text_value($input[$camel] ?? '');
@@ -193,12 +195,20 @@ function update_musician(string $key, array $input): array {
             $links[]=['id'=>uuid(),'url'=>$op['url'],'platform'=>$op['platform'],'label'=>$op['label'],'display_order'=>$op['display_order'],'is_public'=>true];
         }
         $before=snapshot($m);
+        $before['representative']=query('SELECT discord_user_id FROM musician_representatives WHERE musician_id=?',[$m['id']])->fetchColumn() ?: null;
+        if ($representative!=='') {
+            $other=query('SELECT musician_id FROM musician_representatives WHERE discord_user_id=?',[$representative])->fetchColumn();
+            if ($other && $other!==$m['id']) throw new RequestError('slug_conflict',409);
+        }
+        query('DELETE FROM musician_representatives WHERE musician_id=?',[$m['id']]);
+        if ($representative!=='') query('INSERT INTO musician_representatives (musician_id,discord_user_id) VALUES (?,?)',[$m['id'],$representative]);
         $m['profile']=array_replace($m['profile'],$fields,['links'=>$links]);
         if (mb_strlen(profile_summary($m['profile']),'UTF-8')>5600) throw new RequestError('payload_too_large');
         $m['visibility']=$visibility; $m['is_verified']=$input['isVerified']; $m['version']++;
         query('UPDATE musicians SET profile=?,visibility=?,is_verified=?,version=? WHERE id=?',[json($m['profile']),$m['visibility'],(int)$m['is_verified'],$m['version'],$m['id']]);
         query('UPDATE profile_update_sessions SET consumed_at=COALESCE(consumed_at,UTC_TIMESTAMP()) WHERE musician_id=?',[$m['id']]);
-        audit($m['id'],null,'operator','admin_update',$before,snapshot($m),null);
+        $after=snapshot($m); $after['representative']=$representative?:null;
+        audit($m['id'],null,'operator','admin_update',$before,$after,null);
         return $m;
     });
 }

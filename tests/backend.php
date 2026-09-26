@@ -82,9 +82,10 @@ admin_mutation($m['id'],'profile-unlock',[],'100000000000000006',interaction()['
 $confirmedProfile=confirm_current_profile($user,interaction()['id']);
 check($confirmedProfile['id']===$m['id'],'self confirmation returns own profile');
 check((bool)query("SELECT id FROM musician_audit_logs WHERE musician_id=? AND action='profile_confirmed' AND actor_kind='self'",[$m['id']])->fetch(),'self confirmation audited');
-$adminInput=['version'=>(int)$confirmedProfile['version'],'displayName'=>'管理画面更新','nameJp'=>'管理画面更新','nameEn'=>'Admin Update','roles'=>'Producer, Guitar','primarySnsUrl'=>'https://example.com','websiteUrl'=>'','iconImageUrl'=>'','vrcName'=>'','aliases'=>'旧名','canonicalName'=>'','sortName'=>'','discordName'=>'','visibility'=>'draft','isVerified'=>false,'links'=>'Example | https://example.com'];
+$adminInput=['version'=>(int)$confirmedProfile['version'],'displayName'=>'管理画面更新','nameJp'=>'管理画面更新','nameEn'=>'Admin Update','roles'=>'Producer, Guitar','primarySnsUrl'=>'https://example.com','websiteUrl'=>'','iconImageUrl'=>'','vrcName'=>'','aliases'=>'旧名','canonicalName'=>'','sortName'=>'','discordName'=>'','visibility'=>'draft','isVerified'=>false,'links'=>'Example | https://example.com','representativeDiscordUserId'=>$user];
 $adminUpdated=update_musician($m['id'],$adminInput);
 check($adminUpdated['profile']['display_name']==='管理画面更新' && $adminUpdated['visibility']==='draft','admin editor updates profile');
+check(query('SELECT discord_user_id FROM musician_representatives WHERE musician_id=?',[$m['id']])->fetchColumn()===$user,'admin editor updates representative');
 rejects(fn()=>update_musician($m['id'],$adminInput),'version_conflict');
 check((bool)query("SELECT id FROM musician_audit_logs WHERE musician_id=? AND action='admin_update'",[$m['id']])->fetch(),'admin update audited');
 

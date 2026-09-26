@@ -19,6 +19,7 @@ type EditorState = {
   displayName: string; nameJp: string; nameEn: string; canonicalName: string;
   sortName: string; aliases: string; roles: string; primarySnsUrl: string;
   websiteUrl: string; iconImageUrl: string; vrcName: string; discordName: string;
+  representativeDiscordUserId: string;
   visibility: MusicianVisibility; isVerified: boolean; links: string;
 };
 
@@ -30,6 +31,7 @@ function stateFrom(m: AdminMusician): EditorState {
     primarySnsUrl:m.primarySnsUrl ?? "", websiteUrl:m.websiteUrl ?? "",
     iconImageUrl:m.iconImageUrl ?? "", vrcName:m.vrcName ?? "",
     discordName:m.discordName ?? "", visibility:m.visibility,
+    representativeDiscordUserId:m.representativeDiscordUserId ?? "",
     isVerified:m.isVerified,
     links:m.links.map((link)=>`${link.label ? `${link.label} | ` : ""}${link.url}`).join("\n"),
   };
@@ -109,7 +111,7 @@ export function AdminMusicianEditor() {
       </div>
     </aside>
     {selected && form ? <form onSubmit={save} className="flex min-w-0 flex-col gap-5">
-      <div><h3 className="font-semibold">{selected.displayName}</h3><p className="break-all text-xs text-muted">slug: {selected.slug} / version {selected.version} / 代表者: {selected.representativeDiscordUserId ?? "未設定"}</p></div>
+      <div><h3 className="font-semibold">{selected.displayName}</h3><p className="break-all text-xs text-muted">slug: {selected.slug} / version {selected.version}</p></div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="表示名 *"><Input required value={form.displayName} onChange={(e)=>set("displayName",e.target.value)}/></Field>
         <Field label="日本語名 *"><Input required value={form.nameJp} onChange={(e)=>set("nameJp",e.target.value)}/></Field>
@@ -125,6 +127,7 @@ export function AdminMusicianEditor() {
         <Field label="アイコンURL"><Input type="url" value={form.iconImageUrl} onChange={(e)=>set("iconImageUrl",e.target.value)}/></Field>
         <Field label="VRChat名"><Input value={form.vrcName} onChange={(e)=>set("vrcName",e.target.value)}/></Field>
         <Field label="Discord名"><Input value={form.discordName} onChange={(e)=>set("discordName",e.target.value)}/></Field>
+        <Field label="代表者DiscordユーザーID"><Input inputMode="numeric" pattern="[0-9]{17,20}" placeholder="空欄で紐付け解除" value={form.representativeDiscordUserId} onChange={(e)=>set("representativeDiscordUserId",e.target.value.trim())}/></Field>
       </div>
       <Field label="追加リンク（ラベル | URL、1行1件）"><Textarea rows={5} value={form.links} onChange={(e)=>set("links",e.target.value)}/></Field>
       <div className="flex flex-wrap items-center gap-4">
