@@ -16,6 +16,7 @@ type AdminMusician = Musician & {
 };
 
 type EditorState = {
+  slug: string;
   displayName: string; nameJp: string; nameEn: string; canonicalName: string;
   sortName: string; aliases: string; roles: string; primarySnsUrl: string;
   websiteUrl: string; iconImageUrl: string; vrcName: string; discordName: string;
@@ -25,6 +26,7 @@ type EditorState = {
 
 function stateFrom(m: AdminMusician): EditorState {
   return {
+    slug:m.slug,
     displayName:m.displayName, nameJp:m.nameJp, nameEn:m.nameEn,
     canonicalName:m.canonicalName ?? "", sortName:m.sortName ?? "",
     aliases:m.aliases.join(", "), roles:m.roles.join(", "),
@@ -111,8 +113,9 @@ export function AdminMusicianEditor() {
       </div>
     </aside>
     {selected && form ? <form onSubmit={save} className="flex min-w-0 flex-col gap-5">
-      <div><h3 className="font-semibold">{selected.displayName}</h3><p className="break-all text-xs text-muted">slug: {selected.slug} / version {selected.version}</p></div>
+      <div><h3 className="font-semibold">{selected.displayName}</h3><p className="break-all text-xs text-muted">version {selected.version}</p></div>
       <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="slug *"><Input required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={form.slug} onChange={(e)=>set("slug",e.target.value.toLowerCase())}/></Field>
         <Field label="表示名 *"><Input required value={form.displayName} onChange={(e)=>set("displayName",e.target.value)}/></Field>
         <Field label="日本語名 *"><Input required value={form.nameJp} onChange={(e)=>set("nameJp",e.target.value)}/></Field>
         <Field label="英語名 *"><Input required value={form.nameEn} onChange={(e)=>set("nameEn",e.target.value)}/></Field>

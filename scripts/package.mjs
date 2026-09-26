@@ -11,7 +11,7 @@ for (const name of ['bootstrap', 'profile', 'store', 'discord', 'http', 'config.
 }
 await cp('sql/schema.sql', `${target}/schema.sql`);
 await mkdir(`${target}/scripts`);
-for (const name of ['preflight.php', 'register-discord-commands.php', 'discord-commands.json', 'import-office-drafts.php', 'merge-office-duplicates.php', 'publish-confirmed-drafts.php']) {
+for (const name of ['preflight.php', 'register-discord-commands.php', 'discord-commands.json', 'import-office-drafts.php', 'merge-office-duplicates.php', 'strip-office-slug-prefix.php', 'publish-confirmed-drafts.php']) {
   await cp(`scripts/${name}`, `${target}/scripts/${name}`);
 }
 await writeFile(`${target}/INSTALL.md`, await readFile('docs/operator-setup.md'));

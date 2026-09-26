@@ -108,7 +108,7 @@ function own_musician(string $user): array {
 }
 
 function snapshot(array $m): array {
-    return ['profile'=>$m['profile'],'visibility'=>$m['visibility'],'is_verified'=>(bool)$m['is_verified'],'version'=>(int)$m['version'],'is_locked'=>(bool)$m['is_locked']];
+    return ['slug'=>$m['slug'],'profile'=>$m['profile'],'visibility'=>$m['visibility'],'is_verified'=>(bool)$m['is_verified'],'version'=>(int)$m['version'],'is_locked'=>(bool)$m['is_locked']];
 }
 
 function audit(?string $id, ?string $actor, string $kind, string $action, ?array $before, ?array $after, ?string $interaction, string $result = 'succeeded', ?string $error = null): void {
