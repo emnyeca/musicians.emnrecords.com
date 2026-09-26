@@ -16,6 +16,7 @@ Next.js / Reactは既存の画面を維持するため、ローカルのビル�
 - `sql/schema.sql`: 新規MySQL DBの定義。
 - `docs/architecture.md`: プロダクト方針と安全境界。
 - `docs/operator-setup.md`: ローカル起動・WINGへの設置・Discord設定。
+- `docs/roadmap.md`: 公開までの残作業と公開後の運用改善。
 
 ## ローカル起動
 

@@ -134,3 +134,13 @@ function public_musician(array $m): array {
     $result['links'] = array_map(fn($l) => ['id'=>$l['id'],'musicianId'=>$m['id'],'platform'=>$l['platform'],'label'=>$l['label'] ?: null,'url'=>$l['url'],'displayOrder'=>$l['display_order'],'isPublic'=>true], array_values(array_filter($p['links'] ?? [], fn($l) => ($l['is_public'] ?? false) === true)));
     return $result;
 }
+
+function admin_musician(array $m): array {
+    $public=public_musician($m);
+    $public['visibility']=$m['visibility'];
+    $public['version']=(int)$m['version'];
+    $public['isLocked']=(bool)$m['is_locked'];
+    $public['lockedReason']=$m['locked_reason'];
+    $public['representativeDiscordUserId']=query('SELECT discord_user_id FROM musician_representatives WHERE musician_id=?',[$m['id']])->fetchColumn() ?: null;
+    return $public;
+}

@@ -71,11 +71,23 @@ function http_router(string $root): void {
     if ($path==='/api/discord/interactions') { discord_endpoint(); return; }
     if ($path==='/api/admin-access') { admin_access($method); return; }
     if ($path==='/api/admin/musicians') {
+        if (!admin_authorized()) throw new RequestError('unauthorized',401);
+        if ($method==='GET') {
+            $rows=query("SELECT * FROM musicians ORDER BY visibility,COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(profile,'$.sort_name')),''),JSON_UNQUOTE(JSON_EXTRACT(profile,'$.display_name'))),slug")->fetchAll();
+            response(['musicians'=>array_map('admin_musician',$rows)]); return;
+        }
         if ($method!=='POST') throw new RequestError('method_not_allowed',405);
         same_origin();
-        if (!admin_authorized()) throw new RequestError('unauthorized',401);
         $m=create_musician(decode_body(request_body()));
-        response(['ok'=>true,'musician'=>['slug'=>$m['slug'],'url'=>'/musicians/'.$m['slug']]],201); return;
+        $created=admin_musician($m); $created['url']='/musicians/'.$m['slug'];
+        response(['ok'=>true,'musician'=>$created],201); return;
+    }
+    if (preg_match('~^/api/admin/musicians/([a-f0-9-]{36})$~D',$path,$match)) {
+        if ($method!=='PATCH') throw new RequestError('method_not_allowed',405);
+        same_origin();
+        if (!admin_authorized()) throw new RequestError('unauthorized',401);
+        $m=update_musician($match[1],decode_body(request_body()));
+        response(['ok'=>true,'musician'=>admin_musician($m)]); return;
     }
     if ($path==='/api/musicians') {
         if ($method!=='GET') throw new RequestError('method_not_allowed',405);

@@ -171,3 +171,34 @@ function create_musician(array $input): array {
         return $m;
     });
 }
+
+function update_musician(string $key, array $input): array {
+    $mapping=['displayName'=>'display_name','nameJp'=>'name_jp','nameEn'=>'name_en','roles'=>'roles','primarySnsUrl'=>'primary_sns_url','websiteUrl'=>'website_url','iconImageUrl'=>'icon_image_url','vrcName'=>'vrc_name','aliases'=>'aliases'];
+    $allowed=array_merge(array_keys($mapping),['canonicalName','sortName','discordName','visibility','isVerified','links','version']);
+    if (array_diff(array_keys($input),$allowed)) throw new RequestError('unknown_field');
+    if (!is_int($input['version'] ?? null) || !is_bool($input['isVerified'] ?? null)) throw new RequestError('invalid_input');
+    $visibility=$input['visibility'] ?? '';
+    if (!in_array($visibility,['draft','public','hidden'],true)) throw new RequestError('invalid_input');
+    return transaction(function() use ($key,$input,$mapping,$visibility) {
+        $m=musician($key,true);
+        if ((int)$m['version']!==$input['version']) throw new RequestError('version_conflict',409);
+        $fields=[]; foreach ($mapping as $camel=>$snake) $fields[$snake]=$input[$camel] ?? '';
+        $fields=validate_fields($fields);
+        foreach (['canonicalName'=>'canonical_name','sortName'=>'sort_name','discordName'=>'discord_name'] as $camel=>$snake) $fields[$snake]=text_value($input[$camel] ?? '');
+        $links=[];
+        foreach (preg_split('/\r?\n/',text_value($input['links'] ?? '',4000)) as $line) {
+            if (trim($line)==='') continue;
+            $parts=array_map('trim',explode('|',$line,2));
+            $op=validate_link(['url'=>end($parts),'label'=>count($parts)>1?$parts[0]:'','display_order'=>(string)count($links)]);
+            $links[]=['id'=>uuid(),'url'=>$op['url'],'platform'=>$op['platform'],'label'=>$op['label'],'display_order'=>$op['display_order'],'is_public'=>true];
+        }
+        $before=snapshot($m);
+        $m['profile']=array_replace($m['profile'],$fields,['links'=>$links]);
+        if (mb_strlen(profile_summary($m['profile']),'UTF-8')>5600) throw new RequestError('payload_too_large');
+        $m['visibility']=$visibility; $m['is_verified']=$input['isVerified']; $m['version']++;
+        query('UPDATE musicians SET profile=?,visibility=?,is_verified=?,version=? WHERE id=?',[json($m['profile']),$m['visibility'],(int)$m['is_verified'],$m['version'],$m['id']]);
+        query('UPDATE profile_update_sessions SET consumed_at=COALESCE(consumed_at,UTC_TIMESTAMP()) WHERE musician_id=?',[$m['id']]);
+        audit($m['id'],null,'operator','admin_update',$before,snapshot($m),null);
+        return $m;
+    });
+}
