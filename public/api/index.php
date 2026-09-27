@@ -11,7 +11,7 @@ try {
         echo '{"ok":false,"error":"Service is not configured."}';
         exit;
     }
-    foreach (['bootstrap','profile','store','discord','http'] as $file) require_once $runtime.'/'.$file.'.php';
+    foreach (['bootstrap','profile','store','discord','member','http'] as $file) require_once $runtime.'/'.$file.'.php';
     http_router(dirname(__DIR__));
 } catch (Throwable $e) {
     $code=$e instanceof RequestError?$e->reason:'db_error';

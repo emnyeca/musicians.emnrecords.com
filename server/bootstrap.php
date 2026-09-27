@@ -87,6 +87,9 @@ function rate_limit(string $key, int $limit, int $seconds): void {
 
 function error_text(string $code): string {
     return match ($code) {
+        'member_link_invalid' => 'リンクは期限切れ、使用済み、または無効です。Discordのボタンから新しいリンクを開いてください。',
+        'member_session_expired', 'member_access_changed' => '編集の有効期限または登録状況が変わりました。Discordのボタンからもう一度開いてください。入力中の内容はこの画面に残っています。',
+        'discord_unavailable' => 'Discordでメンバー情報を確認できませんでした。少し待ってから再度お試しください。',
         'wrong_guild', 'missing_role', 'missing_operator_role' => 'この操作を行う権限がありません。',
         'representative_missing' => '代表者登録がありません。運営者へ連絡してください。',
         'musician_locked' => 'レコードはロック中です。運営者へ連絡してください。',

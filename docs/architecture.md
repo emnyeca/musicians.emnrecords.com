@@ -10,7 +10,7 @@ Credit作成画面での一時編集は、その場の出力だけに使い、�
 
 名鑑の主役はバーチャルミュージシャン。登録対象は掲載を希望するEMN Recordsコミュニティ構成員とし、Creator / Staffも含める。所属を問わずイベントに関わった人をCreditへ追加できる。
 
-`profile.directory_categories` は `musician` / `creator/staff`。運営が管理画面で分類し、演奏・歌唱・作曲などと他の担当を兼ねる人はMusicianとして扱う。具体的な担当は `roles` に記入する。初期表示はMusician、Creator / StaffフィルターはMusicianを含まない人。名前検索・Credit作成モードでは全員を対象にする。分類のない既存レコードは移行互換としてMusician扱いとし、公開前に運営が確認する。
+`profile.directory_categories` は `musician` / `creator/staff`。運営と本人が編集でき、演奏・歌唱・作曲などと他の担当を兼ねる人はMusicianとして扱う。具体的な担当は `roles` に記入する。初期表示はMusician、Creator / StaffフィルターはMusicianを含まない人。名前検索・Credit作成モードでは全員を対象にする。分類のない既存レコードは移行互換としてMusician扱いとし、公開前に運営が確認する。
 
 外部コラボレーターは名鑑へ継続登録せず、Credit画面でゲストとして入力する。表示名は必須、日本語名・英語名・担当・リンク2件・アイコンURLは任意。日本語名未入力時は表示名を出力に使う。名鑑への所属や公開プロフィールURLをゲストに付与しない。Creditへ載せる名前・担当・リンクは主催者が本人との合意に沿って確認する。
 
@@ -36,6 +36,19 @@ Discord公式仕様に基づき、次を守る。
 参照する正本は、Discord公式の [Receiving and Responding](https://docs.discord.com/developers/interactions/receiving-and-responding)、[Interactions Overview](https://docs.discord.com/developers/interactions/overview)、[Component Reference](https://docs.discord.com/developers/components/reference)、[Application Commands](https://docs.discord.com/developers/interactions/application-commands) とする。実装時には固定した記憶ではなく、その時点の公式仕様を読み直す。
 
 ## 採用する更新の流れ
+
+主な入口は専用チャンネルの「自分のプロフィールを確認・編集」ボタンとする。署名・guild・member/operator roleを検証し、本人だけに見える返信でWeb編集画面へのリンクを発行する。共通メッセージの編集応答は使わず、必ずephemeral応答を作る。
+
+- リンクはランダム256bit、5分間・1回限り。DBにはhashだけを保存し、URLのfragmentで渡してWeb画面で直ちに除去する。ブラウザの永続ストレージへ保存しない。
+- リンク交換後は管理画面とは別の30分sessionを使う。HttpOnly・SameSite=Strict・本番Secure cookie、書き込みのOrigin照合とCSRF tokenで保護する。新しいリンクの発行で古いリンクと編集sessionを失効する。
+- 交換・読み込み・保存時にDiscord APIで現在のguild所属とroleを確認する。Discord障害時は許可せず再試行を案内する。対象はsession内の本人レコードに固定し、紐付け変更、有効期限、version、lockを保存時に再検証する。
+- 紐付け済みなら現在のプロフィールを表示し、明示的な「変更を保存」または「変更せずに確認済みにする」で確定する。
+- 紐付けがなければ新規登録画面にする。既存プロフィールの紐付けは運用開始前に運営が済ませる。作成・本人への紐付け・確認済み監査を同一transactionで行い、常にdraftにする。二重作成はDiscord IDのunique制約と行lockで防ぐ。
+- 新規登録時だけ任意のslugを指定できる。既存slug、公開状態、代表者、運営項目は本人Web APIでは変更できない。新規登録と公開は別の判断とする。
+
+### 従来のスラッシュコマンド
+
+Discordだけで完結する以下の経路も維持する。
 
 1. 本人がEMN Recordsサーバー内で`/emn-profile edit`を実行する。
 2. Interaction handlerが`guild_id`、member role、Discord user ID、代表者との紐づけ、record lockを確認する。
@@ -77,13 +90,14 @@ Officeの共演履歴から得た人物情報は公開情報の完成版とは�
 - `icon_image_url`
 - `vrc_name`
 - `aliases`
+- `directory_categories`（本人Web画面）
 - 公開する`musician_links`
 
 追加リンクModalは`platform`、`label`、`url`、`display_order`、削除指定の最大5項目とする。自由記述のnoteは正本DBへ保存しない。
 
 本人が変更できない項目は次のとおりである。
 
-- `id`、`slug`
+- `id`、既存の`slug`（新規登録時のみ指定可）
 - `visibility`、`is_verified`
 - 代表者とowner情報
 - `is_locked`、`locked_at`、`locked_reason`
@@ -96,7 +110,7 @@ Officeの共演履歴から得た人物情報は公開情報の完成版とは�
 ## 権限とコマンド
 
 - 一般閲覧者: `visibility = 'public'`のミュージシャンと公開リンクだけを読む。
-- 代表者: 自分に紐づいた1レコードの公開プロフィールをpreview確認後に更新し、自分のレコードをロック申請できる。
+- 代表者: 自分に紐づいた1レコードのプロフィールをWeb画面の保存またはDiscordのpreview確認で更新し、自分のレコードをロック申請できる。
 - 運営者: 代表者の設定・失効、対象レコードのロック・解除、非公開化、復旧を行う。
 - DB書き込み処理: 信頼されたPHP APIだけがMySQLへ接続する。DB接続情報・管理パスワード・Discord tokenをブラウザ、interaction payload、通知、ログへ渡さない。
 
@@ -144,6 +158,7 @@ HttpOnly・SameSite=Strict cookie、本番HTTPSでSecure、書き込み時のOri
 - `musicians`: ID、slug、公開状態、version、lockを通常columnで管理し、プロフィール項目と公開リンクを `profile` JSONへまとめる。
 - `musician_representatives`: 現在の代表者だけを管理する。musician IDとDiscord user IDをそれぞれuniqueにし、変更履歴は監査へ残す。
 - `profile_update_sessions`: 提出値・検証済みpayload・基準version・10分の有効期限・消費状態を保持する。
+- `member_web_access`: Discord IDごとの使い捨てリンクhash・5分の期限・対象レコード・session失効用の世代を保持する。既存DBへの追加は`sql/002_member_web_access.sql`を使う。
 - `musician_audit_logs`: 作成、本人更新、失敗、lock、公開状態、復旧、代表者変更の追記専用履歴。update/deleteをtriggerで拒否する。
 - `rate_limits`: 短期の操作回数。期限切れは通常アクセス時に掃除する。
 
@@ -161,7 +176,7 @@ DBの認証情報とPHP実装は `public_html` の外に配置する。
 
 - 本人または運営者から申請があった場合、対象レコードだけをロックする。
 - 不審な連続更新、権限不整合、認証情報流出でも対象レコードをロックできる。
-- ロック中は新規session作成と確定を拒否する。
+- ロック中はDiscord編集session作成と確定を拒否する。本人Web画面は読み取りだけ許可し、保存・確認済み操作を拒否する。
 - ロック解除、代表者変更、過去状態への復旧は運営者だけが行う。運営者は事故対応のためロック中でも復旧でき、復旧後もロック状態を維持する。確認後に必要な場合だけ`/emn-admin profile-unlock`で明示的に解除する。
 - 公開画面から物理削除する機能は作らず、通常は非公開化で対応する。
 - 通常のプロフィール復旧は監査ログの過去状態を新しい変更として反映し、復旧操作も記録する。

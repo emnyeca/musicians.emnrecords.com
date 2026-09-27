@@ -107,6 +107,7 @@ function handle_discord(array $i, array $actor): array {
     $user=$actor['user'];
     rate_limit('discord:'.$user,30,60);
     $type=$i['type'] ?? 0;
+    if ($type===3 && ($i['data']['custom_id'] ?? '')==='member:open') return issue_member_link($i,$actor);
     if ($type===2) {
         [$action,$options]=parse_command($i);
         if (($i['data']['name'] ?? '')==='emn-admin') {
@@ -182,6 +183,21 @@ function discord_request(string $method, string $path, array $body, bool $bot = 
     return true;
 }
 
+function discord_get(string $path): array {
+    $token=config()['discord_bot_token'] ?? '';
+    if ($token==='') throw new RequestError('service_not_configured',503);
+    $ch=curl_init('https://discord.com/api/v10'.$path);
+    curl_setopt_array($ch,[CURLOPT_HTTPHEADER=>['Authorization: Bot '.$token],CURLOPT_RETURNTRANSFER=>true,
+        CURLOPT_CONNECTTIMEOUT_MS=>1000,CURLOPT_TIMEOUT_MS=>5000]);
+    $raw=curl_exec($ch); $status=curl_getinfo($ch,CURLINFO_RESPONSE_CODE); curl_close($ch);
+    if ($status===404) throw new RequestError('discord_not_found',404);
+    if ($raw===false || $status!==200) throw new RequestError('discord_unavailable',503);
+    try { $body=json_decode($raw,true,32,JSON_THROW_ON_ERROR); }
+    catch (JsonException) { throw new RequestError('discord_unavailable',503); }
+    if (!is_array($body)) throw new RequestError('discord_unavailable',503);
+    return $body;
+}
+
 function notify_audit(string $action, array $m, string $user): void {
     $c=config();
     if (empty($c['discord_bot_token']) || empty($c['discord_audit_channel_id'])) return;
@@ -209,7 +225,9 @@ function discord_endpoint(): void {
     }
     // Acknowledge before database work. LSAPI/FPM can finish the HTTP response;
     // on other SAPIs use Discord's callback API, then return HTTP 202.
-    $update=($i['type']===3 || ($i['type']===5 && isset($i['message'])));
+    // The shared entry message MUST NOT be edited with a personal bearer link.
+    $entry=($i['type']===3 && ($i['data']['custom_id'] ?? '')==='member:open');
+    $update=!$entry && ($i['type']===3 || ($i['type']===5 && isset($i['message'])));
     $defer=$update?['type'=>6]:['type'=>5,'data'=>['flags'=>64]];
     $finished=function_exists('litespeed_finish_request') || function_exists('fastcgi_finish_request');
     if ($finished) {

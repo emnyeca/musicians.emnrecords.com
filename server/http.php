@@ -68,6 +68,7 @@ function serve_profile(string $slug, string $root): void {
 function http_router(string $root): void {
     $path=rtrim(parse_url($_SERVER['REQUEST_URI'],PHP_URL_PATH) ?: '/','/');
     $method=$_SERVER['REQUEST_METHOD'] ?? 'GET';
+    if (str_starts_with($path,'/api/member/')) { member_http($path,$method); return; }
     if ($path==='/api/discord/interactions') { discord_endpoint(); return; }
     if ($path==='/api/admin-access') { admin_access($method); return; }
     if ($path==='/api/admin/musicians') {
