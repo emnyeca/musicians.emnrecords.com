@@ -8,6 +8,7 @@
  */
 
 export type MusicianVisibility = "public" | "draft" | "hidden";
+export type DirectoryCategory = "musician" | "creator/staff";
 
 export type IconImageSource =
   | "external_url"
@@ -26,6 +27,7 @@ export type MusicianLink = {
 };
 
 export type Musician = {
+  directoryCategories?: DirectoryCategory[];
   id: string;
   slug: string;
   /** Name mainly shown on cards and lists. */
@@ -60,6 +62,7 @@ export type Musician = {
  * table is the directory's source of truth.
  */
 export type CreditSelection = {
+  sourceKind?: "directory" | "guest";
   musicianId: string;
   slug: string;
   /** Snapshot of the directory data at selection time. */
@@ -72,6 +75,17 @@ export type CreditSelection = {
   overrideLinkSecondary?: string;
   overrideIconImageUrl?: string;
   order: number;
+};
+
+export type CreditGuest = {
+  id: string;
+  displayName: string;
+  nameJp: string;
+  nameEn: string;
+  role: string;
+  linkPrimary: string;
+  linkSecondary: string;
+  iconImageUrl: string;
 };
 
 export type CreditOutputFormat =

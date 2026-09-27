@@ -5,6 +5,12 @@ const BASIC_FIELDS = ['display_name','name_jp','name_en','roles','primary_sns_ur
 const OPTIONAL_FIELDS = ['website_url','icon_image_url','vrc_name','aliases'];
 const LINK_FIELDS = ['url','platform','label','display_order','delete'];
 
+function directory_categories(mixed $value): array {
+    if (!is_array($value) || !array_is_list($value) || count($value) < 1 || count($value) > 2) throw new RequestError('invalid_input');
+    foreach ($value as $category) if (!in_array($category,['musician','creator/staff'],true)) throw new RequestError('invalid_input');
+    return array_values(array_unique($value));
+}
+
 function text_value(mixed $value, int $max = 80, bool $required = false): string {
     if (!is_string($value)) throw new RequestError('invalid_input');
     $value = trim($value);
@@ -130,6 +136,7 @@ function public_musician(array $m): array {
     $result = ['id'=>$m['id'],'slug'=>$m['slug'],'visibility'=>'public','isVerified'=>(bool)$m['is_verified'],'iconStoragePath'=>null,'iconImageSource'=>empty($p['icon_image_url'])?'none':'external_url'];
     foreach (['display_name'=>'displayName','name_jp'=>'nameJp','name_en'=>'nameEn','canonical_name'=>'canonicalName','sort_name'=>'sortName','primary_sns_url'=>'primarySnsUrl','website_url'=>'websiteUrl','icon_image_url'=>'iconImageUrl','vrc_name'=>'vrcName','discord_name'=>'discordName'] as $key=>$name) $result[$name] = $p[$key] ?? null;
     $result['roles'] = $p['roles'] ?? [];
+    $result['directoryCategories'] = $p['directory_categories'] ?? ['musician'];
     $result['aliases'] = $p['aliases'] ?? [];
     $result['links'] = array_map(fn($l) => ['id'=>$l['id'],'musicianId'=>$m['id'],'platform'=>$l['platform'],'label'=>$l['label'] ?: null,'url'=>$l['url'],'displayOrder'=>$l['display_order'],'isPublic'=>true], array_values(array_filter($p['links'] ?? [], fn($l) => ($l['is_public'] ?? false) === true)));
     return $result;

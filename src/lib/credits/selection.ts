@@ -56,10 +56,13 @@ export function resolveCreditPerson(
   const linkSecondary =
     selection.overrideLinkSecondary ??
     m.websiteUrl ??
-    publicLinks.find((u) => u !== linkPrimary) ??
+    (selection.sourceKind === "guest" ? "" : publicLinks.find((u) => u !== linkPrimary)) ??
     "";
 
-  const findByPlatform = (platform: string): string =>
+  const guestLinks = selection.sourceKind === "guest" ? dedupe([linkPrimary, linkSecondary].filter(Boolean)) : null;
+  const findByPlatform = (platform: string): string => guestLinks
+    ? guestLinks.find((url) => detectPlatform(url) === platform) ?? ""
+    :
     sortedPublicLinks.find((l) => l.platform === platform)?.url ??
     publicLinks.find((u) => detectPlatform(u) === platform) ??
     "";
@@ -69,16 +72,16 @@ export function resolveCreditPerson(
     nameJp: selection.overrideNameJp ?? m.nameJp,
     nameEn: selection.overrideNameEn ?? m.nameEn,
     displayName: selection.overrideDisplayName ?? m.displayName,
-    canonicalName: m.canonicalName ?? m.nameEn,
+    canonicalName: selection.sourceKind === "guest" ? selection.overrideDisplayName ?? m.displayName : m.canonicalName ?? m.nameEn,
     role: selection.overrideRole ?? m.roles[0] ?? "",
-    roles: m.roles,
+    roles: selection.sourceKind === "guest" && selection.overrideRole !== undefined ? (selection.overrideRole ? [selection.overrideRole] : []) : m.roles,
     linkPrimary,
     linkSecondary,
-    publicLinks,
+    publicLinks: guestLinks ?? publicLinks,
     xUrl: findByPlatform("x"),
     youtubeUrl: findByPlatform("youtube"),
-    websiteUrl: m.websiteUrl ?? findByPlatform("website"),
-    profileUrl: musicianProfileUrl(selection.slug, options.appUrl),
+    websiteUrl: selection.sourceKind === "guest" ? linkSecondary || findByPlatform("website") : m.websiteUrl ?? findByPlatform("website"),
+    profileUrl: selection.sourceKind === "guest" ? "" : musicianProfileUrl(selection.slug, options.appUrl),
     iconImageUrl: selection.overrideIconImageUrl ?? m.iconImageUrl ?? "",
   };
 }

@@ -13,6 +13,7 @@ export function SiteHeader() {
           </span>
         </Link>
         <nav className="flex items-center gap-5 text-sm">
+          <Link href="/credit-builder" className="text-muted transition-colors hover:text-ink">クレジット作成</Link>
           <Link href="/musicians" className="text-muted transition-colors hover:text-ink">
             Musicians
           </Link>

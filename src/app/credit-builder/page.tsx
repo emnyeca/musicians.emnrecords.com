@@ -5,7 +5,7 @@ import { CreditBuilderForm } from "@/components/credit-builder-form";
 
 export const metadata: Metadata = {
   title: "Credit Builder",
-  description: "Build event credits from selected EMN Records musicians.",
+  description: "Build event credits from EMN Records members and guests.",
   robots: { index: false },
 };
 
@@ -22,7 +22,7 @@ export default function CreditBuilderPage() {
         </Link>
         <h1 className="text-xl font-semibold tracking-tight">Credit Builder</h1>
         <p className="text-sm text-muted">
-          選択した出演者から、イベント告知用のクレジットを生成します
+          出演者・スタッフ・ゲストを選び、イベント用のクレジットを作成します。
         </p>
       </div>
       <CreditBuilderForm />

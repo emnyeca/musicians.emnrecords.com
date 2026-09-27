@@ -37,6 +37,7 @@ export function AdminMusicianCreateForm({
       sortName: data.get("sortName"),
       aliases: data.get("aliases"),
       roles: data.get("roles"),
+      directoryCategories: [data.get("directoryCategory")],
       primarySnsUrl: data.get("primarySnsUrl"),
       websiteUrl: data.get("websiteUrl"),
       iconImageUrl: data.get("iconImageUrl"),
@@ -98,6 +99,9 @@ export function AdminMusicianCreateForm({
           rows={3}
           placeholder="Vocal, Guitar"
         />
+      </Field>
+      <Field label="名鑑の活動区分" htmlFor="admin-category">
+        <Select id="admin-category" name="directoryCategory" defaultValue="musician"><option value="musician">Musician</option><option value="creator/staff">Creator / Staff</option></Select>
       </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -172,7 +176,7 @@ export function AdminMusicianCreateForm({
       <div>
         <Button type="submit" variant="solid" disabled={disabled || submitting}>
           <Plus className="size-4" />
-          {submitting ? "作成中..." : "ミュージシャンを追加"}
+          {submitting ? "作成中..." : "メンバーを追加"}
         </Button>
       </div>
     </form>

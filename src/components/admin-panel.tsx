@@ -20,6 +20,6 @@ export function AdminPanel() {
     <div className="flex justify-between"><h1 className="text-xl font-semibold">Admin</h1>
       <AccessLogoutButton endpoint="/api/admin-access" /></div>
     <section className="flex flex-col gap-4"><h2 className="text-lg font-semibold">登録内容の確認・修正</h2><AdminMusicianEditor /></section>
-    <details className="rounded border border-line p-4"><summary className="cursor-pointer font-medium">新しいミュージシャンを追加</summary><div className="mt-5"><AdminMusicianCreateForm disabled={false} /></div></details>
+    <details className="rounded border border-line p-4"><summary className="cursor-pointer font-medium">新しいメンバーを追加</summary><div className="mt-5"><AdminMusicianCreateForm disabled={false} /></div></details>
   </div>;
 }
