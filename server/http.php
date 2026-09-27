@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/icons.php';
 
 function same_origin(): void {
     $origin=$_SERVER['HTTP_ORIGIN'] ?? '';
@@ -70,6 +71,7 @@ function http_router(string $root): void {
     $method=$_SERVER['REQUEST_METHOD'] ?? 'GET';
     if (str_starts_with($path,'/api/member/')) { member_http($path,$method); return; }
     if ($path==='/api/discord/interactions') { discord_endpoint(); return; }
+    if (str_starts_with($path,'/api/icons/') && $method==='GET') { serve_icon(substr($path,strlen('/api/icons/')),null,isset($_COOKIE['emn_admin']) && admin_authorized()); return; }
     if ($path==='/api/admin-access') { admin_access($method); return; }
     if ($path==='/api/admin/musicians') {
         if (!admin_authorized()) throw new RequestError('unauthorized',401);

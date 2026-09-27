@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { RolePicker, roleSelection, roleValues } from "./role-picker";
 import type { DirectoryCategory, Musician, MusicianVisibility } from "@/types/musician";
 
 type AdminMusician = Musician & {
@@ -19,7 +20,7 @@ type EditorState = {
   directoryCategories: DirectoryCategory[];
   slug: string;
   displayName: string; nameJp: string; nameEn: string; canonicalName: string;
-  sortName: string; aliases: string; roles: string; primarySnsUrl: string;
+  sortName: string; aliases: string; roles: string[]; otherRole: string; primarySnsUrl: string;
   websiteUrl: string; iconImageUrl: string; vrcName: string; discordName: string;
   representativeDiscordUserId: string;
   visibility: MusicianVisibility; isVerified: boolean; links: string;
@@ -31,7 +32,7 @@ function stateFrom(m: AdminMusician): EditorState {
     slug:m.slug,
     displayName:m.displayName, nameJp:m.nameJp, nameEn:m.nameEn,
     canonicalName:m.canonicalName ?? "", sortName:m.sortName ?? "",
-    aliases:m.aliases.join(", "), roles:m.roles.join(", "),
+    aliases:m.aliases.join(", "), ...(m.roleChoices ? {roles:m.roleChoices,otherRole:m.otherRole ?? ""} : roleSelection(m.roles)),
     primarySnsUrl:m.primarySnsUrl ?? "", websiteUrl:m.websiteUrl ?? "",
     iconImageUrl:m.iconImageUrl ?? "", vrcName:m.vrcName ?? "",
     discordName:m.discordName ?? "", visibility:m.visibility,
@@ -88,9 +89,10 @@ export function AdminMusicianEditor() {
     event.preventDefault(); if(!selected || !form) return;
     setSaving(true); setStatus("保存中…");
     try {
+      const { otherRole, ...values } = form;
       const response=await fetch(`/api/admin/musicians/${selected.id}`,{
         method:"PATCH",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({...form,version:selected.version}),
+        body:JSON.stringify({...values,roles:roleValues(form.roles,otherRole),roleChoices:form.roles,otherRole,version:selected.version}),
       });
       const body=await response.json() as {ok?:boolean;musician?:AdminMusician;error?:string};
       if(!response.ok || !body.musician) throw new Error(body.error || "保存できませんでした。");
@@ -125,7 +127,7 @@ export function AdminMusicianEditor() {
         <Field label="並び順名"><Input value={form.sortName} onChange={(e)=>set("sortName",e.target.value)}/></Field>
         <Field label="別名（カンマ区切り）"><Input value={form.aliases} onChange={(e)=>set("aliases",e.target.value)}/></Field>
       </div>
-      <Field label="担当（カンマ区切り） *"><Textarea required rows={2} value={form.roles} onChange={(e)=>set("roles",e.target.value)}/></Field>
+      <RolePicker roles={form.roles} otherRole={form.otherRole} onChange={(roles, otherRole) => setForm((old) => old ? {...old, roles, otherRole} : old)} />
       <Field label="名鑑の活動区分"><Select value={form.directoryCategories.includes("musician") ? "musician" : "creator/staff"} onChange={(e)=>set("directoryCategories",[e.target.value as DirectoryCategory])}>
         <option value="musician">Musician（演奏・歌唱・作曲など）</option><option value="creator/staff">Creator / Staff（Musician以外）</option>
       </Select></Field>
