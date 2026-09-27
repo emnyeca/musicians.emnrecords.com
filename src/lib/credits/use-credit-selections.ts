@@ -3,12 +3,14 @@
 import { useCallback, useSyncExternalStore } from "react";
 import type {
   CreditCustomTemplate,
+  CreditGuest,
   CreditOutputFormat,
   CreditSelection,
   Musician,
 } from "@/types/musician";
 import { CREDIT_FORMAT_OPTIONS, DEFAULT_CUSTOM_TEMPLATE } from "./formats";
 import { makeSelectionFromMusician, sortSelections } from "./selection";
+import { guestSelection, normalizeGuests, validateGuest } from "./guests";
 
 /**
  * localStorage-backed credit builder state (v0.1).
@@ -25,7 +27,7 @@ type LocalStore<T> = {
   subscribe: (listener: () => void) => () => void;
   getSnapshot: () => T;
   getServerSnapshot: () => T;
-  update: (updater: (prev: T) => T) => void;
+  update: (updater: (prev: T) => T) => boolean;
 };
 
 function createLocalStore<T>(
@@ -40,7 +42,8 @@ function createLocalStore<T>(
   function readFromStorage(): void {
     try {
       const raw = window.localStorage.getItem(key);
-      if (raw !== null) {
+      if (raw === null) cached = fallback;
+      else {
         const normalized = normalize(JSON.parse(raw));
         if (normalized !== null) cached = normalized;
       }
@@ -57,8 +60,16 @@ function createLocalStore<T>(
   return {
     subscribe(listener) {
       listeners.add(listener);
+      const onStorage = (event: StorageEvent) => {
+        if (event.key === key || event.key === null) {
+          readFromStorage();
+          for (const notify of listeners) notify();
+        }
+      };
+      window.addEventListener("storage", onStorage);
       return () => {
         listeners.delete(listener);
+        window.removeEventListener("storage", onStorage);
       };
     },
     getSnapshot() {
@@ -71,12 +82,14 @@ function createLocalStore<T>(
     update(updater) {
       ensureInitialized();
       cached = updater(cached);
+      let persisted = true;
       try {
         window.localStorage.setItem(key, JSON.stringify(cached));
       } catch {
-        // storage full / privacy mode: state just won't persist
+        persisted = false;
       }
       for (const listener of listeners) listener();
+      return persisted;
     },
   };
 }
@@ -87,6 +100,18 @@ const selectionsStore = createLocalStore<CreditSelection[]>(
   (value) =>
     Array.isArray(value) ? sortSelections(value as CreditSelection[]) : null,
 );
+
+const guestsStore = createLocalStore<CreditGuest[]>("emn.credit.guests.v1", [], normalizeGuests);
+
+export function useSavedGuests() {
+  const guests = useSyncExternalStore(guestsStore.subscribe, guestsStore.getSnapshot, guestsStore.getServerSnapshot);
+  const saveGuest = useCallback((guest: CreditGuest) => {
+    const checked = validateGuest(guest);
+    return guestsStore.update((previous) => [...previous.filter((p) => p.id !== checked.id), checked]);
+  }, []);
+  const deleteGuest = useCallback((id: string) => guestsStore.update((previous) => previous.filter((p) => p.id !== id)), []);
+  return { guests, saveGuest, deleteGuest };
+}
 
 const modeStore = createLocalStore<boolean>(
   "emn.credit.mode.v1",
@@ -152,6 +177,12 @@ export function useCreditSelections() {
     );
   }, []);
 
+  const addGuest = useCallback((guest: CreditGuest) => {
+    const checked = validateGuest(guest);
+    selectionsStore.update((previous) => previous.some((p) => p.musicianId === checked.id)
+      ? previous : [...previous, guestSelection(checked, previous.length)]);
+  }, []);
+
   const removeMusician = useCallback((musicianId: string) => {
     selectionsStore.update((prev) =>
       sortSelections(prev.filter((s) => s.musicianId !== musicianId)),
@@ -198,6 +229,7 @@ export function useCreditSelections() {
         s.musicianId === musicianId
           ? {
               musicianId: s.musicianId,
+              sourceKind: s.sourceKind,
               slug: s.slug,
               sourceMusician: s.sourceMusician,
               order: s.order,
@@ -212,6 +244,7 @@ export function useCreditSelections() {
     loaded,
     isSelected,
     addMusician,
+    addGuest,
     removeMusician,
     toggleMusician,
     clearSelections,

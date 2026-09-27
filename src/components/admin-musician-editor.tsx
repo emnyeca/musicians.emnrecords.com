@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { Musician, MusicianVisibility } from "@/types/musician";
+import type { DirectoryCategory, Musician, MusicianVisibility } from "@/types/musician";
 
 type AdminMusician = Musician & {
   version: number;
@@ -16,6 +16,7 @@ type AdminMusician = Musician & {
 };
 
 type EditorState = {
+  directoryCategories: DirectoryCategory[];
   slug: string;
   displayName: string; nameJp: string; nameEn: string; canonicalName: string;
   sortName: string; aliases: string; roles: string; primarySnsUrl: string;
@@ -26,6 +27,7 @@ type EditorState = {
 
 function stateFrom(m: AdminMusician): EditorState {
   return {
+    directoryCategories:m.directoryCategories ?? ["musician"],
     slug:m.slug,
     displayName:m.displayName, nameJp:m.nameJp, nameEn:m.nameEn,
     canonicalName:m.canonicalName ?? "", sortName:m.sortName ?? "",
@@ -124,6 +126,10 @@ export function AdminMusicianEditor() {
         <Field label="別名（カンマ区切り）"><Input value={form.aliases} onChange={(e)=>set("aliases",e.target.value)}/></Field>
       </div>
       <Field label="担当（カンマ区切り） *"><Textarea required rows={2} value={form.roles} onChange={(e)=>set("roles",e.target.value)}/></Field>
+      <Field label="名鑑の活動区分"><Select value={form.directoryCategories.includes("musician") ? "musician" : "creator/staff"} onChange={(e)=>set("directoryCategories",[e.target.value as DirectoryCategory])}>
+        <option value="musician">Musician（演奏・歌唱・作曲など）</option><option value="creator/staff">Creator / Staff（Musician以外）</option>
+      </Select></Field>
+      <p className="text-xs text-muted">兼業の方はMusicianを選び、具体的な活動は担当へ記入してください。外部コラボレーターは名鑑に公開せず、クレジットのゲスト追加を利用します。</p>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="主SNS URL"><Input type="url" value={form.primarySnsUrl} onChange={(e)=>set("primarySnsUrl",e.target.value)}/></Field>
         <Field label="Web URL"><Input type="url" value={form.websiteUrl} onChange={(e)=>set("websiteUrl",e.target.value)}/></Field>

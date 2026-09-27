@@ -10,11 +10,11 @@ export default function HomePage() {
           EMN RECORDS
         </p>
         <h1 className="text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-          Musician Directory
+          バーチャルミュージシャン名鑑
         </h1>
         <p className="mx-auto max-w-md text-sm leading-relaxed text-muted">
-          A public directory of virtual musicians around EMN Records. Find
-          performers, follow their links, and build event credits in seconds.
+          EMN Recordsのミュージシャンと、音楽を支えるクリエイター・スタッフを紹介します。
+          クレジット作成では、外部のゲストも追加できます。
         </p>
       </div>
       <Link

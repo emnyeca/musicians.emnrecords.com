@@ -145,11 +145,12 @@ function admin_mutation(string $key, string $action, array $options, string $act
 
 function create_musician(array $input): array {
     $mapping = ['displayName'=>'display_name','nameJp'=>'name_jp','nameEn'=>'name_en','roles'=>'roles','primarySnsUrl'=>'primary_sns_url','websiteUrl'=>'website_url','iconImageUrl'=>'icon_image_url','vrcName'=>'vrc_name','aliases'=>'aliases'];
-    $allowed = array_merge(array_keys($mapping),['slug','canonicalName','sortName','discordName','visibility','isVerified','links']);
+    $allowed = array_merge(array_keys($mapping),['slug','canonicalName','sortName','discordName','visibility','isVerified','links','directoryCategories']);
     if (array_diff(array_keys($input),$allowed)) throw new RequestError('unknown_field');
     $fields = [];
     foreach ($mapping as $camel=>$snake) $fields[$snake] = $input[$camel] ?? '';
     $profile = validate_fields($fields);
+    $profile['directory_categories'] = directory_categories($input['directoryCategories'] ?? ['musician']);
     foreach (['canonicalName'=>'canonical_name','sortName'=>'sort_name','discordName'=>'discord_name'] as $camel=>$snake) $profile[$snake] = text_value($input[$camel] ?? '');
     $slug = text_value($input['slug'] ?? '',100) ?: trim(preg_replace('/[^a-z0-9]+/','-',strtolower($profile['name_en'])),'-');
     if (!preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D',$slug)) throw new RequestError('invalid_input');
@@ -174,7 +175,7 @@ function create_musician(array $input): array {
 
 function update_musician(string $key, array $input): array {
     $mapping=['displayName'=>'display_name','nameJp'=>'name_jp','nameEn'=>'name_en','roles'=>'roles','primarySnsUrl'=>'primary_sns_url','websiteUrl'=>'website_url','iconImageUrl'=>'icon_image_url','vrcName'=>'vrc_name','aliases'=>'aliases'];
-    $allowed=array_merge(array_keys($mapping),['slug','canonicalName','sortName','discordName','visibility','isVerified','links','version','representativeDiscordUserId']);
+    $allowed=array_merge(array_keys($mapping),['slug','canonicalName','sortName','discordName','visibility','isVerified','links','version','representativeDiscordUserId','directoryCategories']);
     if (array_diff(array_keys($input),$allowed)) throw new RequestError('unknown_field');
     if (!is_int($input['version'] ?? null) || !is_bool($input['isVerified'] ?? null)) throw new RequestError('invalid_input');
     $visibility=$input['visibility'] ?? '';
@@ -190,6 +191,7 @@ function update_musician(string $key, array $input): array {
         if ($representative!=='' && !preg_match('/^\d{17,20}$/D',$representative)) throw new RequestError('invalid_input');
         $fields=[]; foreach ($mapping as $camel=>$snake) $fields[$snake]=$input[$camel] ?? '';
         $fields=validate_fields($fields);
+        $fields['directory_categories']=directory_categories($input['directoryCategories'] ?? $m['profile']['directory_categories'] ?? ['musician']);
         foreach (['canonicalName'=>'canonical_name','sortName'=>'sort_name','discordName'=>'discord_name'] as $camel=>$snake) $fields[$snake]=text_value($input[$camel] ?? '');
         $links=[];
         foreach (preg_split('/\r?\n/',text_value($input['links'] ?? '',4000)) as $line) {

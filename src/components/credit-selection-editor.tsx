@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils/cn";
+import { useSavedGuests } from "@/lib/credits/use-credit-selections";
+import { guestFromSelection } from "@/lib/credits/guests";
 import {
   hasOverrides,
   resolveCreditPerson,
@@ -47,6 +49,8 @@ export function CreditSelectionEditor({
   onReset: (musicianId: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("");
+  const { guests, saveGuest } = useSavedGuests();
   const edited = hasOverrides(selection);
 
   // Baseline = directory values resolved without any override.
@@ -54,11 +58,12 @@ export function CreditSelectionEditor({
     () =>
       resolveCreditPerson({
         musicianId: selection.musicianId,
+        sourceKind: selection.sourceKind,
         slug: selection.slug,
         sourceMusician: selection.sourceMusician,
         order: selection.order,
       }),
-    [selection.musicianId, selection.slug, selection.sourceMusician, selection.order],
+    [selection.musicianId, selection.slug, selection.sourceMusician, selection.order, selection.sourceKind],
   );
 
   const fields: {
@@ -93,6 +98,7 @@ export function CreditSelectionEditor({
       <div className="flex items-center gap-3 p-3">
         <span className="w-5 text-center text-xs text-muted">{index + 1}</span>
         <IconImage
+          key={effective.iconImageUrl}
           src={effective.iconImageUrl === "" ? null : effective.iconImageUrl}
           name={effective.displayName}
           initialsSource={effective.nameEn}
@@ -101,6 +107,7 @@ export function CreditSelectionEditor({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-ink">
             {effective.displayName}
+            {selection.sourceKind === "guest" && <span className="ml-2 text-xs text-muted">ゲスト</span>}
             {edited ? (
               <span className="ml-2 rounded bg-accent-soft px-1.5 py-0.5 text-[10px] text-accent-strong">
                 一時編集あり
@@ -180,14 +187,21 @@ export function CreditSelectionEditor({
               );
             })}
           </div>
-          <div className="mt-3 flex justify-end">
+          <p role="status" className="text-xs">{saveStatus}</p>
+          <div className="mt-3 flex flex-wrap justify-end gap-2">
+            {selection.sourceKind === "guest" && <Button size="sm" onClick={() => {
+              try {
+                const saved = saveGuest(guestFromSelection(selection));
+                setSaveStatus(saved ? "この端末に保存しました。" : "端末に保存できませんでした。ブラウザの保存設定や空き容量を確認してください。");
+              } catch (error) { setSaveStatus(error instanceof Error ? error.message : "保存できませんでした。"); }
+            }}>{guests.some((g) => g.id === selection.musicianId) ? "保存済みゲストを更新" : "この端末に保存"}</Button>}
             <Button
               variant="ghost"
               size="sm"
               disabled={!edited}
               onClick={() => onReset(selection.musicianId)}
             >
-              Reset to directory data
+              {selection.sourceKind === "guest" ? "追加時の内容に戻す" : "名鑑の内容に戻す"}
             </Button>
           </div>
         </div>

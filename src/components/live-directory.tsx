@@ -9,5 +9,5 @@ export function LiveDirectory() {
 }
 export function MusicianCount() {
   const { musicians } = useMusicians();
-  return musicians ? <p className="text-xs text-muted">{musicians.length} musicians listed</p> : null;
+  return musicians ? <p className="text-xs text-muted">{musicians.filter((m)=>(m.directoryCategories ?? ["musician"]).includes("musician")).length} musicians / {musicians.length} profiles</p> : null;
 }
