@@ -4,7 +4,7 @@
 
 - [ ] 管理画面で80名の下書きを確認・修正する
   - 活動区分を確認し、EMN Records外のコラボレーターはhiddenにする
-- [x] Creditのゲスト追加・端末内保存と再利用、名鑑のMusician／Creator・Staff分類を実装する（本番反映待ち）
+- [x] Creditのゲスト追加・端末内保存と再利用、名鑑のMusician／Creator・Staff分類を本番へ反映する
 - [ ] サイトの見た目をEMN Recordsらしく整える
   - 見出し案: 「バーチャルミュージシャン名鑑 by EMN Records」
 - [ ] Discordに不慣れなメンバー向けの確認・修正手順を作る
