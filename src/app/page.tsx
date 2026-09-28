@@ -1,29 +1,64 @@
+import Image from "next/image";
 import Link from "next/link";
+import { ArrowUpRight, Headphones, ListMusic, Music2 } from "lucide-react";
 import { MusicianCount } from "@/components/live-directory";
 
-export default function HomePage() {
+const discordGuide = "https://emnrecords.com/emn-records-discord-%e4%b8%80%e8%88%ac%e5%85%ac%e9%96%8b%e3%81%ae%e3%81%8a%e7%9f%a5%e3%82%89%e3%81%9b/";
+const uses = [
+  { icon: Headphones, audience: "音楽を楽しむ方へ", title: "気になる人を探してみる", text: "ライブで出会った名前や、好きな楽器から探してみる。関連リンクを通じてもっと知る。", href: "/musicians", link: "活動者を探す" },
+  { icon: ListMusic, audience: "イベント・作品をつくる方へ", title: "一緒に作った人に感謝を伝える。", text: "きちんとしたクレジットは共演者やスタッフへの感謝の気持ち。名鑑では、本人が登録した情報から、色々なフォーマットでクレジットをまとめられます。また、名鑑にいないゲストは自分だけのリストに追加して、次回以降も使用できます。", href: "/credit-builder", link: "クレジットをつくる" },
+  { icon: Music2, audience: "バーチャルで活動する方へ", title: "あなたの活動を届けてください", text: "担当や活動先のプロフィールとして。登録後はDiscordからいつでも編集できます。共演する方や聴いてくれる方へご自身の活動をぜひ紹介してください。", href: "#join", link: "登録について" },
+];
 
+export default function HomePage() {
   return (
-    <div className="flex flex-col items-center gap-8 py-16 text-center sm:py-24">
-      <div className="flex flex-col gap-3">
-        <p className="text-xs font-medium tracking-[0.3em] text-muted">
-          EMN RECORDS
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-          バーチャルミュージシャン名鑑
-        </h1>
-        <p className="mx-auto max-w-md text-sm leading-relaxed text-muted">
-          EMN Recordsのミュージシャンと、音楽を支えるクリエイター・スタッフを紹介します。
-          クレジット作成では、外部のゲストも追加できます。
-        </p>
-      </div>
-      <Link
-        href="/musicians"
-        className="inline-flex h-11 items-center rounded-md bg-ink px-6 text-sm font-medium text-white transition-opacity hover:opacity-85"
-      >
-        Browse musicians
-      </Link>
-      <MusicianCount />
+    <div className="space-y-20 pb-8 sm:space-y-24">
+      <section className="mx-auto max-w-2xl pt-5 text-center lg:pt-12" aria-labelledby="home-title">
+        <div>
+          <p className="mb-5 text-xs font-semibold tracking-[0.2em] text-[#843c59]">MUSIC, PEOPLE & CONNECTIONS</p>
+          <h1 id="home-title" className="text-3xl font-semibold leading-[1.5] tracking-tight sm:text-4xl">バーチャル<br />ミュージシャン名鑑</h1>
+          <p className="mt-3 text-sm tracking-widest text-muted">by EMN Records</p>
+          <p className="mx-auto mt-6 max-w-lg text-sm leading-8 text-muted">バーチャルで活躍するミュージシャンと、音楽を支えるクリエイター・スタッフを紹介します。クレジット作成では、外部のゲストも追加できます。</p>
+          <div className="mt-7 flex flex-wrap justify-center items-center gap-5">
+            <Link href="/musicians" className="rounded-full bg-ink px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-[#843c59]">名鑑を見る <span aria-hidden="true">→</span></Link>
+            <Link href="/credit-builder" className="text-sm underline decoration-accent underline-offset-4 hover:text-[#843c59]">クレジットをつくる</Link>
+          </div>
+          <div className="mt-5 text-xs text-muted"><MusicianCount /></div>
+        </div>
+      </section>
+
+      <section id="join" className="scroll-mt-8 overflow-hidden rounded-2xl border border-line bg-accent-soft" aria-labelledby="join-title">
+        <div className="grid md:grid-cols-[0.7fr_1fr]">
+          <Image src="/images/top/virtual-session.webp" alt="明るいバーチャル空間で楽器を囲むセッションの参加者たち" width={1000} height={563} className="h-full max-h-72 w-full object-cover md:max-h-none" />
+          <div className="p-6 sm:p-9">
+            <p className="text-xs font-medium tracking-widest text-[#843c59]">FOR ARTISTS & CREATORS</p>
+            <h2 id="join-title" className="mt-3 text-xl font-semibold sm:text-2xl">ご登録について</h2>
+            <p className="mt-4 text-sm leading-7">演奏する方も、支える方もご登録を歓迎します。</p>
+            <ol className="mt-5 space-y-3 text-sm leading-6">
+              <li><span className="mr-2 font-semibold text-[#843c59]">01</span>EMN RecordsのDiscordサーバーに参加。</li>
+              <li><span className="mr-2 font-semibold text-[#843c59]">02</span>最初の質問、または「チャンネル＆ロール」で「Memberとして関わる」を選択。</li>
+              <li><span className="mr-2 font-semibold text-[#843c59]">03</span>運営がご活動を確認次第、メンバーロールを付与しますので、名鑑専用チャンネルから登録・編集できます。</li>
+            </ol>
+            <a href={discordGuide} className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-[#843c59] underline underline-offset-4">Discordへの参加案内 <ArrowUpRight size={16} aria-hidden="true" /></a>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="uses-title">
+        <p className="text-xs font-medium tracking-widest text-[#843c59]">DISCOVER / CREATE / CONNECT</p>
+        <h2 id="uses-title" className="mt-3 text-2xl font-semibold">ミュージシャン名鑑 by EMN Recordsについて</h2>
+        <div className="mt-8 grid gap-8 md:grid-cols-3">
+          {uses.map(({ icon: Icon, audience, title, text, href, link }) => (
+            <article key={title} className="border-t border-line pt-6">
+              <Icon className="mb-5 text-[#843c59]" size={25} strokeWidth={1.5} aria-hidden="true" />
+              <p className="text-xs text-muted">{audience}</p>
+              <h3 className="mt-2 text-lg font-semibold">{title}</h3>
+              <p className="mt-3 text-sm leading-7 text-muted">{text}</p>
+              <Link href={href} className="mt-5 inline-block text-sm font-medium underline decoration-accent underline-offset-4 hover:text-[#843c59]">{link} <span aria-hidden="true">→</span></Link>
+            </article>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

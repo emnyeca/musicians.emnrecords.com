@@ -138,7 +138,7 @@ export function MemberProfileEditor() {
             <p className="text-sm text-muted">{fields.displayName || "あなたの表示名"}<br />{fields.roles.join(", ") || "あなたの担当"}</p>
           </div>
           <label className="block text-sm">アイコン画像をアップロード
-            <input type="file" accept="image/jpeg,image/png,image/webp" className="mt-2 block w-full text-sm" onChange={async (event) => {
+            <input type="file" accept="image/jpeg,image/png,image/webp" className="mt-2 mb-2 block w-full cursor-pointer rounded-md text-sm text-muted file:mr-3 file:cursor-pointer file:rounded-md file:border file:border-line file:bg-accent-soft file:px-4 file:py-2 file:font-medium file:text-[#843c59] hover:file:bg-[#f5e4eb] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#843c59]" onChange={async (event) => {
               const file = event.target.files?.[0]; event.target.value = "";
               if (!file) return;
               if (file.size > 5 * 1024 * 1024) { setError("画像は5MB以下にしてください。"); return; }

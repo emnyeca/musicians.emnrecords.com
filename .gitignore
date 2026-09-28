@@ -48,3 +48,5 @@ wordpress-plugin/**/*.zip
 /.local/
 /server/config.php
 /server/icon-storage/
+/assets/top/
+/public/images/top/
