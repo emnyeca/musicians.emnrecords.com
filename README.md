@@ -33,6 +33,8 @@ npm run dev
 http://127.0.0.1:8080 で確認できます。管理パスワードは `.local/admin-password.txt`。
 初期DBは空です。`/admin/` から登録できます。接続失敗を架空データに置き換えません。
 画面を変更したら `npm run build`、PHPの変更はそのまま反映されます。
+
+トップページの写真はGit管理外です。この端末では `assets/top/` に圧縮済みWebPと元写真の参照先を保存し、同じWebPを `public/images/top/` に置いています。別端末で写真を含む表示・公開ビルドを作る場合は、この2枚を別途配置してください。写真はGitHubへ送らず、公開時だけ配信ファイルに含めます。
 停止は `docker compose stop`。ローカルDBはDocker volumeに保持されます。
 
 ## 検証と公開候補
