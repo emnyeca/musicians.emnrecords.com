@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/icons.php';
 
 const MEMBER_ENTRY_BUTTON = 'member:open';
 
@@ -43,7 +44,7 @@ function member_session_end(): void {
         'secure'=>str_starts_with(config()['app_url'],'https://'),'samesite'=>'Strict']);
 }
 
-function require_current_member(string $user): void {
+function require_current_member(string $user): array {
     $c=config();
     foreach (['discord_guild_id','discord_bot_token','discord_member_role_id','discord_operator_role_id'] as $key) if (empty($c[$key])) throw new RequestError('service_not_configured',503);
     try { $member=discord_get('/guilds/'.rawurlencode($c['discord_guild_id']).'/members/'.rawurlencode($user)); }
@@ -51,6 +52,7 @@ function require_current_member(string $user): void {
     $roles=$member['roles'] ?? [];
     if (($member['user']['id'] ?? '')!==$user || !is_array($roles) ||
         (!in_array($c['discord_member_role_id'],$roles,true) && !in_array($c['discord_operator_role_id'],$roles,true))) throw new RequestError('missing_role',403);
+    return $member;
 }
 
 function consume_member_ticket(string $token): array {
@@ -103,11 +105,14 @@ function member_projection(?array $m): ?array {
 function member_profile_fields(array $input, bool $creating): array {
     $map=['displayName'=>'display_name','nameJp'=>'name_jp','nameEn'=>'name_en','roles'=>'roles',
         'primarySnsUrl'=>'primary_sns_url','websiteUrl'=>'website_url','iconImageUrl'=>'icon_image_url','vrcName'=>'vrc_name','aliases'=>'aliases'];
-    $allowed=array_merge(array_keys($map),['version','links','directoryCategories'],$creating?['slug']:[]);
+    $allowed=array_merge(array_keys($map),['version','links','directoryCategories','slug','otherRole']);
     if (array_diff(array_keys($input),$allowed)) throw new RequestError('unknown_field');
     $values=[];
     foreach ($map as $camel=>$snake) $values[$snake]=$input[$camel] ?? '';
     $profile=validate_fields($values);
+    $profile['roles']=selected_roles($input);
+    $profile['role_choices']=array_values(array_unique($input['roles']));
+    $profile['other_role']=in_array('Other',$input['roles'],true)?text_value($input['otherRole'] ?? '',40):'';
     $profile['directory_categories']=directory_categories($input['directoryCategories'] ?? []);
     $links=$input['links'] ?? [];
     if (!is_array($links) || !array_is_list($links) || count($links)>10) throw new RequestError('invalid_input');
@@ -135,8 +140,13 @@ function save_member_profile(array $session, array $input, bool $confirm=false):
                 if (array_diff(array_keys($input),['version'])) throw new RequestError('unknown_field');
             } else {
                 $m['profile']=array_replace($m['profile'],member_profile_fields($input,false));
+                $slug=text_value($input['slug'] ?? $m['slug'],100,true);
+                if (!preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D',$slug)) throw new RequestError('invalid_input');
+                $owner=query('SELECT id FROM musicians WHERE slug=?',[$slug])->fetchColumn();
+                if ($owner && $owner!==$m['id']) throw new RequestError('slug_conflict',409);
+                $m['slug']=$slug;
                 $m['version']++;
-                query('UPDATE musicians SET profile=?,version=? WHERE id=?',[json($m['profile']),$m['version'],$m['id']]);
+                query('UPDATE musicians SET slug=?,profile=?,version=? WHERE id=?',[$m['slug'],json($m['profile']),$m['version'],$m['id']]);
                 query('UPDATE profile_update_sessions SET consumed_at=COALESCE(consumed_at,UTC_TIMESTAMP()) WHERE musician_id=?',[$m['id']]);
             }
             audit($m['id'],$session['user'],'self',$confirm?'profile_confirmed':'profile_update',$before,snapshot($m),null);
@@ -144,6 +154,7 @@ function save_member_profile(array $session, array $input, bool $confirm=false):
         }
         if ($confirm || ($input['version'] ?? null)!==null) throw new RequestError('member_access_changed',409);
         $profile=member_profile_fields($input,true);
+        $profile['vanity_roles_imported_at']=gmdate('c');
         $slug=text_value($input['slug'] ?? '',100);
         if ($slug==='') {
             $base=trim(preg_replace('/[^a-z0-9]+/','-',strtolower($profile['name_en'])),'-') ?: 'member';
@@ -177,16 +188,34 @@ function member_http(string $path, string $method): void {
     if ($path==='/api/member/session' && $method==='DELETE') {
         same_origin(); member_session_end(); response(['ok'=>true]); return;
     }
-    if (!in_array($path,['/api/member/profile','/api/member/confirm'],true)) throw new RequestError('not_found',404);
+    $iconRead=str_starts_with($path,'/api/member/icon/');
+    if (!$iconRead && !in_array($path,['/api/member/profile','/api/member/confirm','/api/member/slug','/api/member/icon'],true)) throw new RequestError('not_found',404);
     member_access($_SESSION);
-    rate_limit('member-api:'.$_SESSION['user'],30,60);
-    require_current_member($_SESSION['user']); // Never extend Discord authorization by trusting a stale role list.
+    rate_limit(($path==='/api/member/slug'?'member-slug:':'member-api:').$_SESSION['user'],$path==='/api/member/slug'?120:30,60);
+    $discordMember=require_current_member($_SESSION['user']);
+    if ($iconRead && $method==='GET') {
+        $m=member_target($_SESSION); $key=substr($path,strlen('/api/member/icon/'));
+        serve_icon($key,$_SESSION['user'],($m['profile']['icon_image_url'] ?? '')===icon_url($key)); return;
+    }
+    if ($path==='/api/member/slug' && $method==='GET') {
+        $m=member_target($_SESSION); $slug=text_value($_GET['value'] ?? '',100);
+        $valid=(bool)preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D',$slug);
+        $owner=$valid?query('SELECT id FROM musicians WHERE slug=?',[$slug])->fetchColumn():false;
+        response(['valid'=>$valid,'available'=>$valid && (!$owner || $owner===($m['id'] ?? null))]); return;
+    }
     if ($path==='/api/member/profile' && $method==='GET') {
-        response(['musician'=>member_projection(member_target($_SESSION)),'csrf'=>$_SESSION['csrf'],'expiresAt'=>$_SESSION['expires']]); return;
+        response(['musician'=>member_projection(member_target($_SESSION)),'defaults'=>vanity_defaults($discordMember['roles']),'csrf'=>$_SESSION['csrf'],'expiresAt'=>$_SESSION['expires']]); return;
     }
     if ($method!=='POST') throw new RequestError('method_not_allowed',405);
     same_origin();
     if (!hash_equals($_SESSION['csrf'],$_SERVER['HTTP_X_CSRF_TOKEN'] ?? '')) throw new RequestError('forbidden_origin',403);
+    if ($path==='/api/member/icon') {
+        $m=member_target($_SESSION); if ($m) editable($m,$_SESSION['user']);
+        rate_limit('icon-upload:'.$_SESSION['user'],10,3600);
+        $key=store_icon_upload($_SESSION['user'],$_FILES['image'] ?? []);
+        response(['url'=>icon_url($key)]); return;
+    }
+    if (!in_array($path,['/api/member/profile','/api/member/confirm'],true)) throw new RequestError('method_not_allowed',405);
     $confirm=$path==='/api/member/confirm';
     $m=save_member_profile($_SESSION,decode_body(request_body()),$confirm);
     $_SESSION['musician_id']=$m['id'];

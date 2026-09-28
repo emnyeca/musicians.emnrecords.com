@@ -3,7 +3,7 @@ declare(strict_types=1);
 $runtime=is_file(__DIR__.'/../server/bootstrap.php')?__DIR__.'/../server':__DIR__.'/../musicians-private';
 require $runtime.'/bootstrap.php';
 $ok=true;
-foreach (['PHP 8.3+'=>version_compare(PHP_VERSION,'8.3','>='),'pdo_mysql'=>extension_loaded('pdo_mysql'),'mbstring'=>extension_loaded('mbstring'),'sodium'=>extension_loaded('sodium'),'curl'=>extension_loaded('curl')] as $label=>$pass) {
+foreach (['PHP 8.3+'=>version_compare(PHP_VERSION,'8.3','>='),'pdo_mysql'=>extension_loaded('pdo_mysql'),'mbstring'=>extension_loaded('mbstring'),'sodium'=>extension_loaded('sodium'),'curl'=>extension_loaded('curl'),'gd'=>extension_loaded('gd')] as $label=>$pass) {
     echo ($pass?'OK ':'FAIL ').$label."\n"; $ok=$ok && $pass;
 }
 try {

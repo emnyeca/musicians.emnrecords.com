@@ -8,6 +8,7 @@ import { MusicianSearch } from "@/components/musician-search";
 import { RoleFilter } from "@/components/role-filter";
 import { SelectedCreditBar } from "@/components/selected-credit-bar";
 import { Select } from "./ui/select";
+import { roleTags } from "@/lib/roles";
 import {
   useCreditMode,
   useCreditSelections,
@@ -27,7 +28,7 @@ export function MusicianDirectory({ musicians }: { musicians: Musician[] }) {
 
   const allRoles = useMemo(() => {
     const set = new Set<string>();
-    for (const m of musicians) for (const role of m.roles) set.add(role);
+    for (const m of musicians) for (const role of (m.roleTags ?? roleTags(m.roles))) set.add(role);
     return [...set].sort((a, b) => a.localeCompare(b));
   }, [musicians]);
 
@@ -37,7 +38,7 @@ export function MusicianDirectory({ musicians }: { musicians: Musician[] }) {
       const musician = (m.directoryCategories ?? ["musician"]).includes("musician");
       // Search spans the directory; the initial browsing view focuses on musicians.
       if (!q && !creditMode && category !== "all" && (category === "musician") !== musician) return false;
-      if (activeRole !== null && !m.roles.includes(activeRole)) return false;
+      if (activeRole !== null && !(m.roleTags ?? roleTags(m.roles)).includes(activeRole)) return false;
       if (q === "") return true;
       const haystack = [
         m.displayName,

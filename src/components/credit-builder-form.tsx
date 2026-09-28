@@ -8,6 +8,7 @@ import { CreditGuests } from "./credit-guests";
 import {
   useCreditSelections,
   useCustomTemplate,
+  useCreditMode,
 } from "@/lib/credits/use-credit-selections";
 
 /**
@@ -25,6 +26,7 @@ export function CreditBuilderForm() {
     clearSelections,
   } = useCreditSelections();
   const { template, updateTemplate } = useCustomTemplate();
+  const { setCreditMode } = useCreditMode();
 
   if (!loaded) {
     return <p className="py-16 text-center text-sm text-muted">Loading…</p>;
@@ -32,7 +34,7 @@ export function CreditBuilderForm() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link href="/musicians" className="text-sm underline">名鑑から追加</Link>
+      <Link href="/musicians" onClick={() => setCreditMode(true)} className="text-sm underline">名鑑から追加</Link>
       <CreditGuests />
       {selections.length === 0 && <p className="text-sm text-muted">名鑑から選ぶか、ゲストを追加してクレジットを作成してください。</p>}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">

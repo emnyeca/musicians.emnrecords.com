@@ -124,6 +124,10 @@ Modal表示の同期応答とdeferがDiscordの3秒制限内であることは�
 
 ### 通常の更新
 
+画像・担当選択対応版では`roles.php`、`role-catalog.json`、`icons.php`も非公開領域へ配置する。`preflight.php`でGDの有効化を確認し、PHPの`upload_max_filesize`を5M以上、`post_max_size`を6M以上にする。本番は32M/32Mで確認済み。`musicians-private/icon-storage`はPHPが作成・書き込みできる状態にし、以後の配布で削除しない。バックアップ対象に追加する。ローカルは`docker compose build web`でGD対応イメージを作る。
+
+既存プロフィールへのVanity Role取込みは`php /home/c6542929/musicians-scripts/import-vanity-roles.php`で候補を確認し、`--apply`で確定する。先頭担当は維持し、区分はMusicianロールの有無で設定する。取込み後に本人が選び直した区分・担当は再実行しても上書きしない。変更後は本人確認が必要になるため、既存の確認済み判定はversion更新により古くなる。
+
 画面/PHPの変更は公開候補を作り、本人レビュー後にアップロードする。
 プロフィールの通常変更には再ビルド・デプロイ・PCの常時起動は不要。
 初期SQLを更新のたびに再実行しない。DBの内容とconfigはコード配布で上書きしない。

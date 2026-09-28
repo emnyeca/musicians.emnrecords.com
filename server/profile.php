@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+require_once __DIR__.'/roles.php';
 
 const BASIC_FIELDS = ['display_name','name_jp','name_en','roles','primary_sns_url'];
 const OPTIONAL_FIELDS = ['website_url','icon_image_url','vrc_name','aliases'];
@@ -29,9 +30,9 @@ function url_value(mixed $value, bool $required = false): string {
     return $value;
 }
 
-function list_value(mixed $value, int $maxLength, bool $required = false): array {
+function list_value(mixed $value, int $maxLength, bool $required = false, int $maxItems = 10): array {
     if (!is_array($value)) $value = preg_split('/[\n,、]/u', text_value($value, 800));
-    if (!array_is_list($value) || count($value) > 10) throw new RequestError('invalid_input');
+    if (!array_is_list($value) || count($value) > $maxItems) throw new RequestError('invalid_input');
     $items = array_values(array_unique(array_filter(array_map(fn($v) => text_value($v, $maxLength), $value), fn($v) => $v !== '')));
     if ($required && !$items) throw new RequestError('invalid_input');
     return $items;
@@ -41,7 +42,7 @@ function validate_fields(array $fields): array {
     if (array_diff(array_keys($fields), array_merge(BASIC_FIELDS, OPTIONAL_FIELDS))) throw new RequestError('unknown_field');
     foreach ($fields as $k => $v) {
         $fields[$k] = match ($k) {
-            'roles' => list_value($v, 40, true),
+            'roles' => list_value($v, 40, true,30),
             'aliases' => list_value($v, 80),
             'primary_sns_url','website_url','icon_image_url' => url_value($v),
             default => text_value($v, 80, in_array($k, ['display_name','name_jp','name_en'], true)),
@@ -84,7 +85,9 @@ function validate_payload(array $payload): array {
 
 function merged_profile(array $profile, array $payload): array {
     $payload = validate_payload($payload);
+    $rolesChanged=isset($payload['fields']['roles']) && $payload['fields']['roles']!==($profile['roles'] ?? []);
     $profile = array_replace($profile, $payload['fields']);
+    if ($rolesChanged) unset($profile['role_choices'],$profile['other_role']);
     $links = $profile['links'] ?? [];
     foreach ($payload['link_ops'] as $op) {
         $links = array_values(array_filter($links, fn($l) => $l['url'] !== $op['url']));
@@ -136,6 +139,9 @@ function public_musician(array $m): array {
     $result = ['id'=>$m['id'],'slug'=>$m['slug'],'visibility'=>'public','isVerified'=>(bool)$m['is_verified'],'iconStoragePath'=>null,'iconImageSource'=>empty($p['icon_image_url'])?'none':'external_url'];
     foreach (['display_name'=>'displayName','name_jp'=>'nameJp','name_en'=>'nameEn','canonical_name'=>'canonicalName','sort_name'=>'sortName','primary_sns_url'=>'primarySnsUrl','website_url'=>'websiteUrl','icon_image_url'=>'iconImageUrl','vrc_name'=>'vrcName','discord_name'=>'discordName'] as $key=>$name) $result[$name] = $p[$key] ?? null;
     $result['roles'] = $p['roles'] ?? [];
+    $result['roleChoices']=$p['role_choices'] ?? null;
+    $result['otherRole']=$p['other_role'] ?? '';
+    $result['roleTags']=$p['role_choices'] ?? role_tags($result['roles']);
     $result['directoryCategories'] = $p['directory_categories'] ?? ['musician'];
     $result['aliases'] = $p['aliases'] ?? [];
     $result['links'] = array_map(fn($l) => ['id'=>$l['id'],'musicianId'=>$m['id'],'platform'=>$l['platform'],'label'=>$l['label'] ?: null,'url'=>$l['url'],'displayOrder'=>$l['display_order'],'isPublic'=>true], array_values(array_filter($p['links'] ?? [], fn($l) => ($l['is_public'] ?? false) === true)));

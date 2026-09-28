@@ -47,3 +47,4 @@ wordpress-plugin/**/*.zip
 
 /.local/
 /server/config.php
+/server/icon-storage/

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { RolePicker, roleValues } from "./role-picker";
 
 type CreateResult =
   | { ok: true; musician: { slug: string; url: string } }
@@ -18,6 +19,8 @@ export function AdminMusicianCreateForm({
   disabled: boolean;
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const [roles, setRoles] = useState<string[]>([]);
+  const [otherRole, setOtherRole] = useState("");
   const [result, setResult] = useState<CreateResult | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -36,7 +39,8 @@ export function AdminMusicianCreateForm({
       canonicalName: data.get("canonicalName"),
       sortName: data.get("sortName"),
       aliases: data.get("aliases"),
-      roles: data.get("roles"),
+      roles: roleValues(roles, otherRole),
+      roleChoices: roles, otherRole,
       directoryCategories: [data.get("directoryCategory")],
       primarySnsUrl: data.get("primarySnsUrl"),
       websiteUrl: data.get("websiteUrl"),
@@ -56,7 +60,7 @@ export function AdminMusicianCreateForm({
       });
       const body = (await response.json()) as CreateResult;
       setResult(body);
-      if (body.ok) form.reset();
+      if (body.ok) { form.reset(); setRoles([]); setOtherRole(""); }
     } catch {
       setResult({ ok: false, error: "通信に失敗しました。" });
     } finally {
@@ -91,15 +95,7 @@ export function AdminMusicianCreateForm({
         </Field>
       </div>
 
-      <Field label="担当 *" htmlFor="admin-roles">
-        <Textarea
-          id="admin-roles"
-          name="roles"
-          required
-          rows={3}
-          placeholder="Vocal, Guitar"
-        />
-      </Field>
+      <RolePicker roles={roles} otherRole={otherRole} onChange={(values, other) => { setRoles(values); setOtherRole(other); }} />
       <Field label="名鑑の活動区分" htmlFor="admin-category">
         <Select id="admin-category" name="directoryCategory" defaultValue="musician"><option value="musician">Musician</option><option value="creator/staff">Creator / Staff</option></Select>
       </Field>
@@ -174,7 +170,7 @@ export function AdminMusicianCreateForm({
       ) : null}
 
       <div>
-        <Button type="submit" variant="solid" disabled={disabled || submitting}>
+        <Button type="submit" variant="solid" disabled={disabled || submitting || !roles.length}>
           <Plus className="size-4" />
           {submitting ? "作成中..." : "メンバーを追加"}
         </Button>

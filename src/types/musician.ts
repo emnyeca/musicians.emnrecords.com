@@ -27,6 +27,9 @@ export type MusicianLink = {
 };
 
 export type Musician = {
+  roleChoices?: string[] | null;
+  otherRole?: string;
+  roleTags?: string[];
   directoryCategories?: DirectoryCategory[];
   id: string;
   slug: string;
