@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils/cn";
 import { useSavedGuests } from "@/lib/credits/use-credit-selections";
-import { guestFromSelection } from "@/lib/credits/guests";
+import { guestFromSelection, isLocalIcon } from "@/lib/credits/guests";
 import {
   hasOverrides,
   resolveCreditPerson,
@@ -176,13 +176,20 @@ export function CreditSelectionEditor({
                       <span className="ml-1 text-accent-strong">*</span>
                     ) : null}
                   </Label>
-                  <Input
-                    id={`${selection.musicianId}-${field.key}`}
-                    value={value}
-                    onChange={(e) =>
-                      handleFieldChange(field.key, field.baseValue, e.target.value)
-                    }
-                  />
+                  {isLocalIcon(value) ? (
+                    <p className="flex items-center gap-2 text-xs">
+                      この端末の画像
+                      <Button size="sm" onClick={() => handleFieldChange(field.key, field.baseValue, "")}>画像を外す</Button>
+                    </p>
+                  ) : (
+                    <Input
+                      id={`${selection.musicianId}-${field.key}`}
+                      value={value}
+                      onChange={(e) =>
+                        handleFieldChange(field.key, field.baseValue, e.target.value)
+                      }
+                    />
+                  )}
                 </div>
               );
             })}

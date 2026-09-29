@@ -53,7 +53,6 @@ export type Musician = {
   vrcName: string | null;
   discordName: string | null;
   visibility: MusicianVisibility;
-  isVerified: boolean;
   links: MusicianLink[];
 };
 

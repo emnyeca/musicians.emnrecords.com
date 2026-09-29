@@ -82,7 +82,7 @@ php scripts/import-office-drafts.php /非公開パス/people.json
 php scripts/import-office-drafts.php /非公開パス/people.json --apply
 ```
 
-本人確認は`/emn-profile confirm`または本人によるプロフィール更新で記録する。掲載辞退は`/emn-profile withdraw confirm:true`で非公開・ロック状態にする。
+本人確認は`/emn-profile confirm`または本人によるプロフィール更新で記録する。掲載を望まない本人は、Web画面で公開状態を「非公開」（hidden）にする。
 
 告知した確認期日の後、一括公開候補をdry-runで確認する。
 
@@ -118,7 +118,7 @@ Modal表示の同期応答とdeferがDiscordの3秒制限内であることは�
 
 メンバーへの案内は「下のボタンを押してプロフィールを確認してください。」とする。本人限定の返信からWeb画面を開き、変更があれば「変更を保存」、変更がなければ「変更せずに確認済みにする」。未登録なら「下書きとして登録」。リンクは5分以内、編集は30分以内。期限切れの場合はDiscordから新しいリンクを開く。
 
-掲載辞退は従来どおり`/emn-profile withdraw confirm:true`。コマンド入力が難しければ運営へ連絡する。公開状態の変更は本人編集とは別に運営が行う。
+公開状態は本人がWeb画面で選ぶ。掲載を辞退する場合は「非公開」を選んで保存する。
 
 導入後、Discord実機で本人限定の返信、共有投稿に個人リンクが出ないこと、保存・監査通知、退会・role削除後の拒否を確認する。ローカル検証ではDiscordへの実送信を行わない。
 
@@ -127,6 +127,13 @@ Modal表示の同期応答とdeferがDiscordの3秒制限内であることは�
 画像・担当選択対応版では`roles.php`、`role-catalog.json`、`icons.php`も非公開領域へ配置する。`preflight.php`でGDの有効化を確認し、PHPの`upload_max_filesize`を5M以上、`post_max_size`を6M以上にする。本番は32M/32Mで確認済み。`musicians-private/icon-storage`はPHPが作成・書き込みできる状態にし、以後の配布で削除しない。バックアップ対象に追加する。ローカルは`docker compose build web`でGD対応イメージを作る。
 
 既存プロフィールへのVanity Role取込みは`php /home/c6542929/musicians-scripts/import-vanity-roles.php`で候補を確認し、`--apply`で確定する。先頭担当は維持し、区分はMusicianロールの有無で設定する。取込み後に本人が選び直した区分・担当は再実行しても上書きしない。変更後は本人確認が必要になるため、既存の確認済み判定はversion更新により古くなる。
+
+### 不審フラグ・本人の公開状態・削除の導入
+
+1. PHP一式・`scripts`一式・公開ファイルを配置する。
+2. `install-suspicious-flag.php`で内容を確認し、`--apply`で適用する。先に新しい監査triggerを作り、成功した場合だけ旧triggerの削除と`is_verified`→`is_suspicious`の置換へ進む。trigger作成が拒否された場合（binary log有効でSUPER権限がないなど）は何も変えずに止まるので、phpMyAdminから同じSQLを実行するか、サーバー設定を確認する。
+3. `preflight.php`で`MySQL schema and audit triggers`がOKになることを確認する。
+4. `register-discord-commands.php --apply`で`/emn-profile withdraw`を外したコマンドを登録する。
 
 画面/PHPの変更は公開候補を作り、本人レビュー後にアップロードする。
 プロフィールの通常変更には再ビルド・デプロイ・PCの常時起動は不要。

@@ -23,19 +23,6 @@
       },
       {
         "type": 1,
-        "name": "withdraw",
-        "description": "掲載を辞退して非公開・ロック状態にする",
-        "options": [
-          {
-            "type": 5,
-            "name": "confirm",
-            "description": "掲載辞退を確定する",
-            "required": true
-          }
-        ]
-      },
-      {
-        "type": 1,
         "name": "lock",
         "description": "自分のレコードの一時ロックを申請する",
         "options": [

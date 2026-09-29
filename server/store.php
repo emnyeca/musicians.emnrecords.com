@@ -60,7 +60,8 @@ function confirm_session(string $id, string $user, string $interaction): array {
         $m['version']++;
         query('UPDATE musicians SET profile=?,version=? WHERE id=?', [json($m['profile']),$m['version'],$m['id']]);
         query('UPDATE profile_update_sessions SET consumed_at=UTC_TIMESTAMP() WHERE session_id=?', [$id]);
-        audit($m['id'],$user,'self','profile_update',$before,snapshot($m),$interaction);
+        $m['audit_id'] = audit($m['id'],$user,'self','profile_update',$before,snapshot($m),$interaction);
+        $m['before'] = $before;
         return $m;
     });
 }
@@ -86,7 +87,7 @@ function admin_mutation(string $key, string $action, array $options, string $act
         $m = musician($key,true);
         ensure_new_interaction($interaction);
         if ($self) {
-            if (!in_array($action,['profile-lock','profile-withdraw'],true)) throw new RequestError('missing_operator_role');
+            if ($action!=='profile-lock') throw new RequestError('missing_operator_role');
             require_representative($m['id'],$actor);
         }
         $before = snapshot($m);
@@ -110,11 +111,11 @@ function admin_mutation(string $key, string $action, array $options, string $act
                 $m['is_locked'] = $action==='profile-lock';
                 query('UPDATE musicians SET is_locked=?,locked_at=?,locked_reason=? WHERE id=?', [(int)$m['is_locked'],$m['is_locked']?gmdate('Y-m-d H:i:s'):null,$m['is_locked']?(text_value($options['reason'] ?? '',200) ?: 'ロック申請'):null,$m['id']]);
                 break;
-            case 'profile-withdraw':
-                if (($options['confirm'] ?? false) !== true) throw new RequestError('invalid_input');
+            case 'profile-suspicious':
+                $m['is_suspicious'] = true;
                 $m['visibility'] = 'hidden';
                 $m['is_locked'] = true;
-                query('UPDATE musicians SET is_locked=1,locked_at=UTC_TIMESTAMP(),locked_reason=? WHERE id=?', ['本人による掲載辞退',$m['id']]);
+                query('UPDATE musicians SET is_locked=1,locked_at=UTC_TIMESTAMP(),locked_reason=? WHERE id=?', ['不審な変更として運営が停止',$m['id']]);
                 break;
             case 'profile-hide': $m['visibility']='hidden'; break;
             case 'profile-show': $m['visibility']='public'; break;
@@ -124,28 +125,36 @@ function admin_mutation(string $key, string $action, array $options, string $act
                 $log = query('SELECT before_snapshot,after_snapshot FROM musician_audit_logs WHERE id=? AND musician_id=? AND result=?', [$options['audit_log'] ?? '',$m['id'],'succeeded'])->fetch();
                 $saved = $log ? json_decode($log[$state.'_snapshot'] ?? 'null',true) : null;
                 if (!is_array($saved['profile'] ?? null)) throw new RequestError('snapshot_not_restorable');
-                // Restore content/visibility only; preserve current lock and representative.
+                // Restore content/visibility only; preserve current lock, suspicious flag and representative.
                 $m['profile'] = $saved['profile'];
                 validate_fields(array_intersect_key($m['profile'],array_flip(array_merge(BASIC_FIELDS,OPTIONAL_FIELDS))));
                 $m['visibility'] = $saved['visibility'];
-                $m['is_verified'] = (bool)$saved['is_verified'];
                 break;
             default: throw new RequestError('invalid_input');
         }
         $m['version']++;
-        query('UPDATE musicians SET profile=?,visibility=?,is_verified=?,version=? WHERE id=?',[json($m['profile']),$m['visibility'],(int)$m['is_verified'],$m['version'],$m['id']]);
+        query('UPDATE musicians SET profile=?,visibility=?,is_suspicious=?,version=? WHERE id=?',[json($m['profile']),$m['visibility'],(int)$m['is_suspicious'],$m['version'],$m['id']]);
         // All administrative changes invalidate outstanding previews, including reassignment.
         query('UPDATE profile_update_sessions SET consumed_at=COALESCE(consumed_at,UTC_TIMESTAMP()) WHERE musician_id=?',[$m['id']]);
         $after = snapshot($m);
         if (str_starts_with($action,'representative-')) $after['representative'] = $options['user'] ?? null;
+        if ($action==='profile-suspicious') $after['reported_audit_log'] = $options['audit_log'] ?? null;
+        $m['before'] = $before;
         audit($m['id'],$actor,$self?'self':'operator',$action,$before,$after,$interaction);
         return $m;
     });
 }
 
+// Operator button on a self-change notification in the audit channel.
+function mark_suspicious(string $auditLogId, string $actor, string $interaction): array {
+    $id = query("SELECT musician_id FROM musician_audit_logs WHERE id=? AND actor_kind='self' AND result='succeeded' AND musician_id IS NOT NULL",[$auditLogId])->fetchColumn();
+    if (!$id) throw new RequestError('musician_not_found',404);
+    return admin_mutation($id,'profile-suspicious',['audit_log'=>$auditLogId],$actor,$interaction);
+}
+
 function create_musician(array $input): array {
     $mapping = ['displayName'=>'display_name','nameJp'=>'name_jp','nameEn'=>'name_en','roles'=>'roles','primarySnsUrl'=>'primary_sns_url','websiteUrl'=>'website_url','iconImageUrl'=>'icon_image_url','vrcName'=>'vrc_name','aliases'=>'aliases'];
-    $allowed = array_merge(array_keys($mapping),['slug','canonicalName','sortName','discordName','visibility','isVerified','links','directoryCategories','roleChoices','otherRole']);
+    $allowed = array_merge(array_keys($mapping),['slug','canonicalName','sortName','discordName','visibility','links','directoryCategories','roleChoices','otherRole']);
     if (array_diff(array_keys($input),$allowed)) throw new RequestError('unknown_field');
     $fields = [];
     foreach ($mapping as $camel=>$snake) $fields[$snake] = $input[$camel] ?? '';
@@ -160,7 +169,7 @@ function create_musician(array $input): array {
     $slug = text_value($input['slug'] ?? '',100) ?: trim(preg_replace('/[^a-z0-9]+/','-',strtolower($profile['name_en'])),'-');
     if (!preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D',$slug)) throw new RequestError('invalid_input');
     $visibility = $input['visibility'] ?? 'draft';
-    if (!in_array($visibility,['draft','public','hidden'],true) || !is_bool($input['isVerified'] ?? false)) throw new RequestError('invalid_input');
+    if (!in_array($visibility,['draft','public','hidden'],true)) throw new RequestError('invalid_input');
     $links = [];
     foreach (preg_split('/\r?\n/',text_value($input['links'] ?? '',4000)) as $line) {
         if (trim($line)==='') continue;
@@ -169,9 +178,9 @@ function create_musician(array $input): array {
     }
     $profile = merged_profile($profile,['fields'=>[],'link_ops'=>$links]);
     if (mb_strlen(profile_summary($profile),'UTF-8') > 5600) throw new RequestError('payload_too_large');
-    return transaction(function() use ($slug,$profile,$visibility,$input) {
+    return transaction(function() use ($slug,$profile,$visibility) {
         $id = uuid();
-        query('INSERT INTO musicians (id,slug,profile,visibility,is_verified) VALUES (?,?,?,?,?)',[$id,$slug,json($profile),$visibility,(int)($input['isVerified'] ?? false)]);
+        query('INSERT INTO musicians (id,slug,profile,visibility) VALUES (?,?,?,?)',[$id,$slug,json($profile),$visibility]);
         $m = musician($id);
         audit($id,null,'operator','create',null,snapshot($m),null);
         return $m;
@@ -180,9 +189,9 @@ function create_musician(array $input): array {
 
 function update_musician(string $key, array $input): array {
     $mapping=['displayName'=>'display_name','nameJp'=>'name_jp','nameEn'=>'name_en','roles'=>'roles','primarySnsUrl'=>'primary_sns_url','websiteUrl'=>'website_url','iconImageUrl'=>'icon_image_url','vrcName'=>'vrc_name','aliases'=>'aliases'];
-    $allowed=array_merge(array_keys($mapping),['slug','canonicalName','sortName','discordName','visibility','isVerified','links','version','representativeDiscordUserId','directoryCategories','roleChoices','otherRole']);
+    $allowed=array_merge(array_keys($mapping),['slug','canonicalName','sortName','discordName','visibility','isSuspicious','isLocked','links','version','representativeDiscordUserId','directoryCategories','roleChoices','otherRole']);
     if (array_diff(array_keys($input),$allowed)) throw new RequestError('unknown_field');
-    if (!is_int($input['version'] ?? null) || !is_bool($input['isVerified'] ?? null)) throw new RequestError('invalid_input');
+    if (!is_int($input['version'] ?? null) || !is_bool($input['isSuspicious'] ?? null) || !is_bool($input['isLocked'] ?? null)) throw new RequestError('invalid_input');
     $visibility=$input['visibility'] ?? '';
     if (!in_array($visibility,['draft','public','hidden'],true)) throw new RequestError('invalid_input');
     return transaction(function() use ($key,$input,$mapping,$visibility) {
@@ -220,8 +229,12 @@ function update_musician(string $key, array $input): array {
         if ($representative!=='') query('INSERT INTO musician_representatives (musician_id,discord_user_id) VALUES (?,?)',[$m['id'],$representative]);
         $m['profile']=array_replace($m['profile'],$fields,['links'=>$links]);
         if (mb_strlen(profile_summary($m['profile']),'UTF-8')>5600) throw new RequestError('payload_too_large');
-        $m['slug']=$slug; $m['visibility']=$visibility; $m['is_verified']=$input['isVerified']; $m['version']++;
-        query('UPDATE musicians SET slug=?,profile=?,visibility=?,is_verified=?,version=? WHERE id=?',[$m['slug'],json($m['profile']),$m['visibility'],(int)$m['is_verified'],$m['version'],$m['id']]);
+        $m['slug']=$slug; $m['visibility']=$visibility; $m['is_suspicious']=$input['isSuspicious']; $m['version']++;
+        query('UPDATE musicians SET slug=?,profile=?,visibility=?,is_suspicious=?,version=? WHERE id=?',[$m['slug'],json($m['profile']),$m['visibility'],(int)$m['is_suspicious'],$m['version'],$m['id']]);
+        if ($input['isLocked']!==(bool)$m['is_locked']) {
+            $m['is_locked']=$input['isLocked'];
+            query('UPDATE musicians SET is_locked=?,locked_at=?,locked_reason=? WHERE id=?',[(int)$m['is_locked'],$m['is_locked']?gmdate('Y-m-d H:i:s'):null,$m['is_locked']?'運営によるロック':null,$m['id']]);
+        }
         query('UPDATE profile_update_sessions SET consumed_at=COALESCE(consumed_at,UTC_TIMESTAMP()) WHERE musician_id=?',[$m['id']]);
         $after=snapshot($m); $after['representative']=$representative?:null;
         audit($m['id'],null,'operator','admin_update',$before,$after,null);

@@ -5,21 +5,32 @@ import { Check, Plus } from "lucide-react";
 import type { Musician } from "@/types/musician";
 import { Button } from "@/components/ui/button";
 import { CopyButton } from "@/components/copy-button";
-import { renderCredit } from "@/lib/credits/render-credit";
-import { makeSelectionFromMusician } from "@/lib/credits/selection";
 import { useCreditSelections } from "@/lib/credits/use-credit-selections";
+import { musicianProfileUrl } from "@/lib/utils/url";
+
+/** Every public field as labelled lines; empty fields are omitted. */
+function fullProfileText(m: Musician): string {
+  const lines: [string, string][] = [
+    ["表示名", m.displayName], ["日本語名", m.nameJp], ["英語名", m.nameEn],
+    ["担当", m.roles.join(", ")], ["主SNS", m.primarySnsUrl ?? ""], ["Web", m.websiteUrl ?? ""],
+    ["VRChat名", m.vrcName ?? ""], ["別名義", m.aliases.join(", ")],
+    ["プロフィール", musicianProfileUrl(m.slug)], ["アイコン", m.iconImageUrl ?? ""],
+  ];
+  const text = lines.filter(([, value]) => value.trim() !== "").map(([label, value]) => `${label}: ${value}`);
+  const links = [...m.links].filter((l) => l.isPublic).sort((a, b) => a.displayOrder - b.displayOrder);
+  if (links.length) text.push("リンク:", ...links.map((l) => `- ${l.label ? `${l.label}: ` : ""}${l.url}`));
+  return text.join("\n");
+}
 
 /**
- * Detail page actions: add the musician to the credit selection and copy an
- * EMN Minimal Credit block for this single person.
+ * Detail page actions: add the musician to the credit selection and copy all
+ * public profile information for this person.
  */
 export function MusicianDetailActions({ musician }: { musician: Musician }) {
   const { isSelected, addMusician, loaded } = useCreditSelections();
   const selected = loaded && isSelected(musician.id);
 
-  const creditInfo = renderCredit("emn_minimal", [
-    makeSelectionFromMusician(musician, 0),
-  ]).output;
+  const creditInfo = fullProfileText(musician);
 
   return (
     <div className="flex flex-wrap items-center gap-2">

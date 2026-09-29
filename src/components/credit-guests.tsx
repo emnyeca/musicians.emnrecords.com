@@ -3,15 +3,16 @@
 import { useState, type FormEvent } from "react";
 import type { CreditGuest } from "@/types/musician";
 import { useCreditSelections, useSavedGuests } from "@/lib/credits/use-credit-selections";
-import { validateGuest } from "@/lib/credits/guests";
+import { isLocalIcon, localIconFromFile, validateGuest } from "@/lib/credits/guests";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { IconImage } from "./icon-image";
 
 const emptyGuest: CreditGuest = { id: "", displayName: "", nameJp: "", nameEn: "", role: "", linkPrimary: "", linkSecondary: "", iconImageUrl: "" };
 const fields = [
   ["displayName", "表示名 *"], ["nameJp", "日本語名（任意）"], ["nameEn", "英語名（任意）"],
   ["role", "担当（例：PA、KP、執筆）"], ["linkPrimary", "SNS・Web URL"],
-  ["linkSecondary", "追加リンクURL"], ["iconImageUrl", "アイコンURL（任意）"],
+  ["linkSecondary", "追加リンクURL"],
 ] as const;
 
 export function CreditGuests() {
@@ -49,6 +50,23 @@ export function CreditGuests() {
             maxLength={key.includes("Url") || key.startsWith("link") ? 1200 : 200} value={form[key]}
             onChange={(e) => setForm({ ...form, [key]: e.target.value })} />
         </label>)}</div>
+      <div className="flex flex-wrap items-end gap-3">
+        <IconImage key={form.iconImageUrl} src={form.iconImageUrl || null} name={form.displayName || "ゲスト"} className="!w-16 shrink-0" />
+        {isLocalIcon(form.iconImageUrl)
+          ? <p className="text-sm">この端末の画像を使用中 <Button type="button" size="sm" onClick={() => setForm({ ...form, iconImageUrl: "" })}>画像を外す</Button></p>
+          : <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm">アイコンURL（任意）
+            <Input type="url" maxLength={1200} value={form.iconImageUrl} onChange={(e) => setForm({ ...form, iconImageUrl: e.target.value })} />
+          </label>}
+        <label className="flex flex-col gap-1 text-sm">または端末の画像を選ぶ
+          <input type="file" accept="image/jpeg,image/png,image/webp" className="text-xs text-muted file:mr-2 file:rounded-md file:border file:border-line file:bg-background file:px-3 file:py-1.5" onChange={async (e) => {
+            const file = e.target.files?.[0]; e.target.value = "";
+            if (!file) return;
+            try { const iconImageUrl = await localIconFromFile(file); setForm((old) => ({ ...old, iconImageUrl })); setStatus(""); }
+            catch (error) { setStatus(error instanceof Error ? error.message : "画像を読み込めませんでした。"); }
+          }} />
+        </label>
+      </div>
+      <p className="text-xs text-muted">端末の画像はアップロードされず、このブラウザ内だけで使います。クレジットの文字出力には含まれません。</p>
       {!form.id && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={save} onChange={(e) => setSave(e.target.checked)} />この端末に保存する</label>}
       <div className="flex gap-2"><Button variant="solid" type="submit">{form.id ? "保存済みの情報を更新" : "クレジットに追加"}</Button>
         <Button type="button" onClick={() => setOpen(false)}>キャンセル</Button></div>

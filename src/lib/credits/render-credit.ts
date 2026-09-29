@@ -9,6 +9,7 @@ import {
   type TemplateRenderOptions,
 } from "./custom-template";
 import { resolveCreditPerson, type ResolvedCreditPerson } from "./selection";
+import { outputIconUrl } from "./guests";
 
 /**
  * Fixed-preset credit rendering + dispatch for all output formats.
@@ -174,7 +175,7 @@ function renderJson(people: ResolvedCreditPerson[]): string {
       linkSecondary: p.linkSecondary,
       links: p.publicLinks,
       profileUrl: p.profileUrl,
-      iconImageUrl: p.iconImageUrl,
+      iconImageUrl: outputIconUrl(p.iconImageUrl),
     })),
     null,
     2,

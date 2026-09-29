@@ -3,16 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { IconImage } from "@/components/icon-image";
 import { RolePicker, roleSelection } from "./role-picker";
-import type { Musician } from "@/types/musician";
+import type { Musician, MusicianVisibility } from "@/types/musician";
 
 type OwnProfile = Musician & { version: number; isLocked: boolean };
 type Session = { musician: OwnProfile | null; csrf: string; expiresAt: number; defaults?: { roles: string[]; directoryCategories: string[] } };
 type Fields = {
   displayName: string; nameJp: string; nameEn: string; roles: string[]; otherRole: string;
   primarySnsUrl: string; websiteUrl: string; iconImageUrl: string;
-  vrcName: string; aliases: string; slug: string;
+  vrcName: string; aliases: string; slug: string; visibility: MusicianVisibility;
   directoryCategories: string[]; links: { label: string; url: string }[];
 };
 
@@ -22,6 +23,7 @@ function fieldsFrom(m: OwnProfile | null): Fields {
     ...(m?.roleChoices ? {roles: m.roleChoices, otherRole: m.otherRole ?? ""} : roleSelection(m?.roles ?? [])), aliases: m?.aliases.join(", ") ?? "",
     primarySnsUrl: m?.primarySnsUrl ?? "", websiteUrl: m?.websiteUrl ?? "",
     iconImageUrl: m?.iconImageUrl ?? "", vrcName: m?.vrcName ?? "", slug: m?.slug ?? "",
+    visibility: m?.visibility ?? "draft",
     directoryCategories: m?.directoryCategories ?? ["musician"],
     links: m?.links.map(({ label, url }) => ({ label: label ?? "", url })) ?? [],
   };
@@ -38,7 +40,7 @@ async function api<T>(path: string, method = "GET", body?: unknown, csrf?: strin
   return data;
 }
 
-const definitions: { key: Exclude<keyof Fields, "directoryCategories" | "links" | "slug" | "roles" | "otherRole">; label: string; required?: boolean; url?: boolean; max: number; hint?: string }[] = [
+const definitions: { key: Exclude<keyof Fields, "directoryCategories" | "links" | "slug" | "roles" | "otherRole" | "visibility">; label: string; required?: boolean; url?: boolean; max: number; hint?: string }[] = [
   { key: "displayName", label: "表示名", required: true, max: 80 },
   { key: "nameJp", label: "日本語名", required: true, max: 80, hint: "日本語表記がない場合は表示名と同じで構いません。" },
   { key: "nameEn", label: "英語名", required: true, max: 80 },
@@ -111,8 +113,19 @@ export function MemberProfileEditor() {
       setSession({ ...session, musician: result.musician }); setFields(updated); setBaseline(JSON.stringify(updated));
       setFinishedProfile(result.musician);
       setNotice(confirm ? "現在の内容を確認済みとして記録しました。" :
-        result.musician.visibility === "public" ? "保存しました。公開プロフィールに反映されました。" : "保存しました。現在は非公開です。公開は運営が行います。");
+        result.musician.visibility === "public" ? "保存しました。公開プロフィールに反映されました。" : "保存しました。現在は名鑑に掲載されていません。");
     } catch (e) { setError(e instanceof Error ? e.message : "保存できませんでした。入力内容はこの画面に残っています。"); }
+    finally { setBusy(false); }
+  }
+  async function erase() {
+    if (!session || !profile) return;
+    if (window.prompt("プロフィール・アップロードした画像・変更履歴をすべて削除します。元に戻せません。\n削除する場合は「削除」と入力してください。") !== "削除") return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await api("delete", "POST", { version: profile.version }, session.csrf);
+      setSession(null); setFields(fieldsFrom(null)); setFinishedProfile(null);
+      setNotice("プロフィールをデータベースから削除しました。もう一度登録する場合は、Discordのボタンから新規作成できます。");
+    } catch (e) { setError(e instanceof Error ? e.message : "削除できませんでした。"); }
     finally { setBusy(false); }
   }
 
@@ -128,7 +141,7 @@ export function MemberProfileEditor() {
       {finishedProfile.visibility !== "public" && <p className="mt-1 text-muted">現在は非公開のため、公開後にこのリンクから閲覧できます。</p>}
     </div>}
     {session && <>
-      <p className="mt-4 text-sm text-muted">{profile ? `公開状態：${({ public: "公開中", draft: "下書き（非公開）", hidden: "非公開" })[profile.visibility]}` : "あなたのDiscordアカウントに紐付けて、下書きとして登録します。"}</p>
+      <p className="mt-4 text-sm text-muted">{profile ? `公開状態：${({ public: "公開中", draft: "下書き（非公開）", hidden: "非公開" })[profile.visibility]}` : "あなたのDiscordアカウントに紐付けて登録します。"}</p>
       <p className="mt-2 text-sm text-muted">保存する内容は名鑑に掲載するプロフィールです。編集できる時間はリンクを開いてから30分間です。</p>
       {profile?.isLocked && <p role="alert" className="mt-4">このプロフィールは運営により編集がロックされています。運営にお問い合わせください。</p>}
       <form className="mt-6" onSubmit={(event) => { event.preventDefault(); void save(false); }}>
@@ -143,7 +156,7 @@ export function MemberProfileEditor() {
               if (!file) return;
               if (file.size > 5 * 1024 * 1024) { setError("画像は5MB以下にしてください。"); return; }
               setBusy(true); setError("");
-              try { const body = new FormData(); body.append("image", file); const result = await api<{ url: string }>("icon", "POST", body, session.csrf); change("iconImageUrl", result.url); setNotice("画像を読み込みました。「変更を保存」または「下書きとして登録」で確定してください。"); }
+              try { const body = new FormData(); body.append("image", file); const result = await api<{ url: string }>("icon", "POST", body, session.csrf); change("iconImageUrl", result.url); setNotice("画像を読み込みました。「変更を保存」または「登録する」で確定してください。"); }
               catch (e) { setError(e instanceof Error ? e.message : "画像をアップロードできませんでした。"); }
               finally { setBusy(false); }
             }} />
@@ -167,6 +180,14 @@ export function MemberProfileEditor() {
             <p className="mt-1 text-xs text-muted">半角英小文字・数字・ハイフン。変更すると本人ページのURLも変わり、古いURLは利用できなくなります。新規登録時の空欄は自動作成です。</p>
             {fields.slug && fields.slug !== profile?.slug && <p role="status" className="mt-1 text-xs">{slugCheck?.value === fields.slug ? slugCheck.text : "重複を確認中…"}</p>}
           </div>
+          <div className="text-sm"><label htmlFor="member-visibility" className="mb-1 block font-medium">公開状態</label>
+            <Select id="member-visibility" aria-describedby="hint-visibility" value={fields.visibility} onChange={(e) => change("visibility", e.target.value as MusicianVisibility)}>
+              <option value="public">公開（名鑑に掲載する）</option>
+              <option value="draft">下書き（準備中・掲載しない）</option>
+              <option value="hidden">非公開（掲載しない）</option>
+            </Select>
+            <p id="hint-visibility" className="mt-1 text-xs text-muted">掲載を辞退する場合は「非公開」を選んで保存してください。あとから公開に戻せます。</p>
+          </div>
           <div className="space-y-3"><p className="text-sm font-medium">追加リンク（任意・10件まで）</p>
             {fields.links.map((link, index) => <div key={index} className="flex flex-wrap gap-2 rounded-md border border-line p-3">
               <label className="min-w-0 flex-1 text-xs">リンク名<Input value={link.label} maxLength={80} onChange={(e) => change("links", fields.links.map((v, i) => i === index ? { ...v, label: e.target.value } : v))} /></label>
@@ -176,7 +197,7 @@ export function MemberProfileEditor() {
             <Button type="button" disabled={fields.links.length >= 10} onClick={() => change("links", [...fields.links, { label: "", url: "" }])}>リンクを追加</Button>
           </div>
           <div className="flex flex-wrap gap-3 border-t border-line pt-5">
-            <Button type="submit" variant="accent" disabled={!fields.roles.length || !fields.directoryCategories.length || (!!profile && !dirty) || (slugCheck?.value === fields.slug && !slugCheck.available)}>{busy ? "処理中…" : profile ? "変更を保存" : "下書きとして登録"}</Button>
+            <Button type="submit" variant="accent" disabled={!fields.roles.length || !fields.directoryCategories.length || (!!profile && !dirty) || (slugCheck?.value === fields.slug && !slugCheck.available)}>{busy ? "処理中…" : profile ? "変更を保存" : "登録する"}</Button>
             {profile && <Button type="button" disabled={dirty} onClick={() => void save(true)}>変更せずに確認済みにする</Button>}
           </div>
         </fieldset>
@@ -188,6 +209,11 @@ export function MemberProfileEditor() {
         catch (e) { setError(e instanceof Error ? e.message : "終了できませんでした。"); }
         finally { setBusy(false); }
       }}>編集を終了</Button>
+      {profile && <section className="mt-10 rounded-lg border border-red-300 p-4">
+        <h2 className="font-semibold text-red-900">データベースから削除</h2>
+        <p className="mt-1 text-sm text-muted">プロフィール、アップロードした画像、変更履歴をすべて削除します。元に戻せません。掲載をやめるだけなら、公開状態を「非公開」にして保存してください。</p>
+        <Button className="mt-3 border-red-300 text-red-900" disabled={busy || profile.isLocked} onClick={() => void erase()}>データベースから削除</Button>
+      </section>}
     </>}
   </main>;
 }

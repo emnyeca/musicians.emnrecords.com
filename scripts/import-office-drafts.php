@@ -84,7 +84,7 @@ transaction(function() use ($plan) {
     foreach ($plan as $p) {
         if ($p['existing'] || $p['hold']) continue;
         $id=uuid();
-        query('INSERT INTO musicians (id,slug,profile,visibility,is_verified) VALUES (?,?,?,?,0)',[$id,$p['slug'],json($p['profile']),'draft']);
+        query('INSERT INTO musicians (id,slug,profile,visibility) VALUES (?,?,?,?)',[$id,$p['slug'],json($p['profile']),'draft']);
         $m=musician($id);
         audit($id,null,'system','office_import',null,snapshot($m),null);
     }
