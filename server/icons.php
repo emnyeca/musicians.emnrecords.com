@@ -7,13 +7,14 @@ function icon_key(string $url): ?string {
     $key=str_starts_with($url,$prefix)?substr($url,strlen($prefix)):'';
     return preg_match('~^[a-f0-9]{64}/[a-f0-9]{32}\.png$~D',$key)?$key:null;
 }
-// Removes the member's uploads and the given icons unless another profile still uses them.
+// Preserve other profiles' current images and the images needed by their audit history.
 function erase_icons(string $user, array $keys): void {
     $owner=hash('sha256',$user);
     foreach (glob(icon_root().'/'.$owner.'/*.png') ?: [] as $file) $keys[]=$owner.'/'.basename($file);
     foreach (array_unique($keys) as $key) {
         if (!preg_match('~^[a-f0-9]{64}/[a-f0-9]{32}\.png$~D',$key)) continue;
         if (query("SELECT id FROM musicians WHERE JSON_UNQUOTE(JSON_EXTRACT(profile,'$.icon_image_url'))=? LIMIT 1",[icon_url($key)])->fetchColumn()) continue;
+        if (query("SELECT id FROM musician_audit_logs WHERE JSON_UNQUOTE(JSON_EXTRACT(before_snapshot,'$.profile.icon_image_url'))=? OR JSON_UNQUOTE(JSON_EXTRACT(after_snapshot,'$.profile.icon_image_url'))=? LIMIT 1",[icon_url($key),icon_url($key)])->fetchColumn()) continue;
         if (is_file(icon_root().'/'.$key) && !unlink(icon_root().'/'.$key)) error_log('musicians: icon erase failed');
     }
     if (is_dir(icon_root().'/'.$owner)) @rmdir(icon_root().'/'.$owner);

@@ -198,8 +198,8 @@ function erase_member_profile(array $session, array $input): array {
         }
         query('DELETE FROM profile_update_sessions WHERE musician_id=?',[$m['id']]);
         query('DELETE FROM musician_representatives WHERE musician_id=?',[$m['id']]);
-        query('UPDATE member_web_access SET musician_id=NULL WHERE musician_id=?',[$m['id']]);
-        query('DELETE FROM member_web_access WHERE discord_user_id=?',[$session['user']]);
+        // Keep the generation counter so re-registration cannot revive an old session.
+        query('UPDATE member_web_access SET musician_id=NULL,generation=generation+1,token_hash=NULL,token_expires_at=UTC_TIMESTAMP() WHERE musician_id=? OR discord_user_id=?',[$m['id'],$session['user']]);
         query('SET @emn_erase_musician_id=?',[$m['id']]);
         try { query('DELETE FROM musician_audit_logs WHERE musician_id=?',[$m['id']]); }
         finally { query('SET @emn_erase_musician_id=NULL'); }

@@ -9,6 +9,7 @@ foreach (['PHP 8.3+'=>version_compare(PHP_VERSION,'8.3','>='),'pdo_mysql'=>exten
 try {
     $c=config(); db();
     foreach (['musicians','musician_representatives','profile_update_sessions','musician_audit_logs','rate_limits','member_web_access'] as $table) query('SELECT 1 FROM '.$table.' LIMIT 1');
+    query('SELECT is_suspicious FROM musicians LIMIT 1');
     $triggers=query("SHOW TRIGGERS WHERE `Table`='musician_audit_logs'")->fetchAll();
     $names=array_column($triggers,'Trigger');
     $audit=in_array('audit_no_update',$names,true) && in_array('audit_delete_erasure_only',$names,true) && !in_array('audit_no_delete',$names,true);
