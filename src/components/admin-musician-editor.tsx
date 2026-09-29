@@ -12,6 +12,7 @@ import type { DirectoryCategory, Musician, MusicianVisibility } from "@/types/mu
 type AdminMusician = Musician & {
   version: number;
   isLocked: boolean;
+  isSuspicious: boolean;
   lockedReason: string | null;
   representativeDiscordUserId: string | null;
 };
@@ -23,7 +24,7 @@ type EditorState = {
   sortName: string; aliases: string; roles: string[]; otherRole: string; primarySnsUrl: string;
   websiteUrl: string; iconImageUrl: string; vrcName: string; discordName: string;
   representativeDiscordUserId: string;
-  visibility: MusicianVisibility; isVerified: boolean; links: string;
+  visibility: MusicianVisibility; isSuspicious: boolean; isLocked: boolean; links: string;
 };
 
 function stateFrom(m: AdminMusician): EditorState {
@@ -37,7 +38,7 @@ function stateFrom(m: AdminMusician): EditorState {
     iconImageUrl:m.iconImageUrl ?? "", vrcName:m.vrcName ?? "",
     discordName:m.discordName ?? "", visibility:m.visibility,
     representativeDiscordUserId:m.representativeDiscordUserId ?? "",
-    isVerified:m.isVerified,
+    isSuspicious:m.isSuspicious, isLocked:m.isLocked,
     links:m.links.map((link)=>`${link.label ? `${link.label} | ` : ""}${link.url}`).join("\n"),
   };
 }
@@ -112,7 +113,7 @@ export function AdminMusicianEditor() {
       <div className="max-h-[65vh] overflow-y-auto rounded border border-line">
         {filtered.map((m)=><button key={m.id} type="button" onClick={()=>choose(m)} className={`block w-full border-b border-line px-3 py-2 text-left text-sm last:border-0 ${m.id===selectedId?"bg-accent-soft":"hover:bg-surface"}`}>
           <span className="block font-medium">{m.displayName || "(名称未設定)"}</span>
-          <span className="block text-xs text-muted">{m.slug} · {m.visibility}{m.isLocked?" · locked":""}</span>
+          <span className="block text-xs text-muted">{m.slug} · {m.visibility}{m.isLocked?" · locked":""}{m.isSuspicious?" · suspicious":""}</span>
         </button>)}
       </div>
     </aside>
@@ -143,7 +144,8 @@ export function AdminMusicianEditor() {
       <Field label="追加リンク（ラベル | URL、1行1件）"><Textarea rows={5} value={form.links} onChange={(e)=>set("links",e.target.value)}/></Field>
       <div className="flex flex-wrap items-center gap-4">
         <Field label="公開状態"><Select value={form.visibility} onChange={(e)=>set("visibility",e.target.value as MusicianVisibility)}><option value="draft">draft</option><option value="public">public</option><option value="hidden">hidden</option></Select></Field>
-        <label className="mt-6 flex items-center gap-2 text-sm"><input type="checkbox" checked={form.isVerified} onChange={(e)=>set("isVerified",e.target.checked)}/> verified</label>
+        <label className="mt-6 flex items-center gap-2 text-sm"><input type="checkbox" checked={form.isSuspicious} onChange={(e)=>set("isSuspicious",e.target.checked)}/> suspicious</label>
+        <label className="mt-6 flex items-center gap-2 text-sm"><input type="checkbox" checked={form.isLocked} onChange={(e)=>set("isLocked",e.target.checked)}/> 本人の編集をロック</label>
         {selected.isLocked?<span className="mt-6 text-sm text-red-700">ロック中: {selected.lockedReason}</span>:null}
       </div>
       <div><Button type="submit" variant="solid" disabled={saving}>{saving?"保存中…":"変更を保存"}</Button></div>

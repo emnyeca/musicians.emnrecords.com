@@ -136,11 +136,6 @@ function handle_discord(array $i, array $actor): array {
             notify_audit('profile_confirmed',$m,$user);
             return ephemeral('現在の登録内容を確認済みとして記録しました。');
         }
-        if ($action==='withdraw') {
-            $m=admin_mutation($m['id'],'profile-withdraw',['confirm'=>(bool)($options['confirm'] ?? false)],$user,$i['id'],true);
-            notify_audit('profile-withdraw',$m,$user);
-            return ephemeral('掲載辞退を受け付け、非公開・ロック状態にしました。再掲載は運営者へ連絡してください。');
-        }
         if ($action==='lock') {
             $m=admin_mutation($m['id'],'profile-lock',$options,$user,$i['id'],true);
             notify_audit('profile-lock',$m,$user);
@@ -149,6 +144,13 @@ function handle_discord(array $i, array $actor): array {
         throw new RequestError('invalid_input');
     }
     $custom=$i['data']['custom_id'] ?? '';
+    if ($type===3 && preg_match('/^'.SUSPICIOUS_BUTTON.':([a-f0-9-]{36})$/D',$custom,$match)) {
+        if (!$actor['operator']) throw new RequestError('missing_operator_role');
+        $m=mark_suspicious($match[1],$user,$i['id']);
+        mark_notification_handled($i,'→ 不審な変更として非公開・ロックしました（operator '.$user.'）');
+        notify_audit('profile-suspicious',$m,$user);
+        return ephemeral('不審な変更として非公開・ロックしました: '.$m['slug']."\n変更前に戻す場合: /emn-admin profile-restore musician:".$m['slug'].' audit_log:'.$match[1].' state:before'."\n解除は管理画面、または /emn-admin profile-unlock で行ってください。");
+    }
     if ($type===5) {
         $previous=null; $form='basic';
         if ($custom!=='pm:basic:new') {
@@ -164,7 +166,7 @@ function handle_discord(array $i, array $actor): array {
     if ($action==='cancel') { cancel_session($id,$user); return ephemeral('キャンセルしました。変更は反映されていません。'); }
     if ($action==='confirm') {
         $m=confirm_session($id,$user,$i['id']);
-        notify_audit('profile_update',$m,$user);
+        notify_audit('profile_update',$m,$user,$m['audit_id']);
         query('DELETE FROM profile_update_sessions WHERE expires_at < UTC_TIMESTAMP() LIMIT 1000');
         return ephemeral('反映しました (version '.$m['version'].')。公開名鑑に反映されます。');
     }
@@ -198,13 +200,61 @@ function discord_get(string $path): array {
     return $body;
 }
 
-function notify_audit(string $action, array $m, string $user): void {
+const SUSPICIOUS_BUTTON = 'audit:suspicious';
+
+function diff_value(mixed $value): string {
+    if (is_array($value)) $value = implode(', ',$value);
+    if (is_bool($value)) $value = $value?'yes':'no';
+    $value = trim((string)$value);
+    if ($value==='') return '(未設定)';
+    return discord_text(mb_strlen($value,'UTF-8')>300?mb_substr($value,0,300,'UTF-8').'…':$value);
+}
+
+// Only the changed fields; list fields show added/removed items, not whole lists.
+// $before=null is a new record, so every filled field is the change.
+function snapshot_diff(?array $before, array $after): string {
+    $labels=['slug'=>'slug','visibility'=>'公開状態','is_locked'=>'ロック','is_suspicious'=>'不審フラグ','display_name'=>'表示名','name_jp'=>'日本語名','name_en'=>'英語名','roles'=>'担当','directory_categories'=>'活動区分','primary_sns_url'=>'主SNS','website_url'=>'Web','icon_image_url'=>'アイコン','vrc_name'=>'VRChat名','aliases'=>'別名義','links'=>'追加リンク'];
+    $value=function(?array $s, string $key) {
+        if ($s===null) return null;
+        $v=array_key_exists($key,$s)?$s[$key]:($s['profile'][$key] ?? '');
+        if ($key==='links') $v=array_map(fn($l)=>trim(($l['label'] ?? '').' '.($l['url'] ?? '')),$v ?: []);
+        return $v;
+    };
+    $lines=[];
+    foreach ($labels as $key=>$label) {
+        $new=$value($after,$key); $old=$value($before,$key);
+        if ($before===null) { if (diff_value($new)!=='(未設定)' && !in_array($key,['is_locked','is_suspicious'],true)) $lines[]=$label.': '.diff_value($new); continue; }
+        if ($old===$new) continue;
+        if (is_array($old) || is_array($new)) {
+            $old=is_array($old)?$old:[]; $new=is_array($new)?$new:[];
+            $added=array_diff($new,$old); $removed=array_diff($old,$new);
+            $parts=array_merge(array_map(fn($v)=>'+'.diff_value($v),$added),array_map(fn($v)=>'−'.diff_value($v),$removed));
+            if (!$parts) $parts[]='並び順を変更（先頭: '.diff_value($new[0] ?? '').'）';
+            $lines[]=$label.': '.implode(' / ',$parts);
+        } else $lines[]=$label.': '.diff_value($old).' → '.diff_value($new);
+    }
+    $text=implode("\n",$lines);
+    return mb_strlen($text,'UTF-8')>3900?mb_substr($text,0,3900,'UTF-8').'…':$text;
+}
+
+// $auditId is set for a member's own change; operators get a button to stop it.
+function notify_audit(string $action, array $m, string $user, ?string $auditId = null): void {
     $c=config();
     if (empty($c['discord_bot_token']) || empty($c['discord_audit_channel_id'])) return;
-    discord_request('POST','/channels/'.rawurlencode($c['discord_audit_channel_id']).'/messages',[
-        'content'=>$action.' / '.discord_text($m['slug']).' / actor '.$user.' / version '.$m['version'],
-        'allowed_mentions'=>['parse'=>[]],
-    ],true);
+    $body=['content'=>$action.' / '.discord_text($m['slug']).' / actor '.$user.' / version '.$m['version'].' / '.$m['visibility'],'allowed_mentions'=>['parse'=>[]]];
+    if (array_key_exists('before',$m)) {
+        $diff=snapshot_diff($m['before'],snapshot($m));
+        if ($diff!=='') $body['embeds']=[['description'=>$diff]];
+    }
+    if ($auditId!==null) $body['components']=[['type'=>1,'components'=>[['type'=>2,'style'=>4,'label'=>'不審な変更です','custom_id'=>SUSPICIOUS_BUTTON.':'.$auditId]]]];
+    discord_request('POST','/channels/'.rawurlencode($c['discord_audit_channel_id']).'/messages',$body,true);
+}
+
+// Record the outcome on the shared notification and remove its button.
+function mark_notification_handled(array $i, string $line): void {
+    $channel=$i['channel_id'] ?? $i['message']['channel_id'] ?? ''; $message=$i['message']['id'] ?? '';
+    if (!preg_match('/^\d{17,20}$/D',(string)$channel) || !preg_match('/^\d{17,20}$/D',(string)$message)) return;
+    discord_request('PATCH','/channels/'.$channel.'/messages/'.$message,['content'=>mb_substr((string)($i['message']['content'] ?? ''),0,1800,'UTF-8')."\n".$line,'components'=>[],'allowed_mentions'=>['parse'=>[]]],true);
 }
 
 function discord_endpoint(): void {
@@ -225,9 +275,11 @@ function discord_endpoint(): void {
     }
     // Acknowledge before database work. LSAPI/FPM can finish the HTTP response;
     // on other SAPIs use Discord's callback API, then return HTTP 202.
-    // The shared entry message MUST NOT be edited with a personal bearer link.
-    $entry=($i['type']===3 && ($i['data']['custom_id'] ?? '')==='member:open');
-    $update=!$entry && ($i['type']===3 || ($i['type']===5 && isset($i['message'])));
+    // The shared entry message MUST NOT be edited with a personal bearer link, and
+    // the shared audit notification is edited separately, only after success.
+    $custom=$i['data']['custom_id'] ?? '';
+    $shared=$i['type']===3 && ($custom==='member:open' || str_starts_with($custom,SUSPICIOUS_BUTTON.':'));
+    $update=!$shared && ($i['type']===3 || ($i['type']===5 && isset($i['message'])));
     $defer=$update?['type'=>6]:['type'=>5,'data'=>['flags'=>64]];
     $finished=function_exists('litespeed_finish_request') || function_exists('fastcgi_finish_request');
     if ($finished) {

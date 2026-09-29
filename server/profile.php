@@ -117,16 +117,19 @@ function own_musician(string $user): array {
 }
 
 function snapshot(array $m): array {
-    return ['slug'=>$m['slug'],'profile'=>$m['profile'],'visibility'=>$m['visibility'],'is_verified'=>(bool)$m['is_verified'],'version'=>(int)$m['version'],'is_locked'=>(bool)$m['is_locked']];
+    return ['slug'=>$m['slug'],'profile'=>$m['profile'],'visibility'=>$m['visibility'],'is_suspicious'=>(bool)$m['is_suspicious'],'version'=>(int)$m['version'],'is_locked'=>(bool)$m['is_locked']];
 }
 
-function audit(?string $id, ?string $actor, string $kind, string $action, ?array $before, ?array $after, ?string $interaction, string $result = 'succeeded', ?string $error = null): void {
+function audit(?string $id, ?string $actor, string $kind, string $action, ?array $before, ?array $after, ?string $interaction, string $result = 'succeeded', ?string $error = null): string {
+    $logId = uuid();
     query('INSERT INTO musician_audit_logs (id,musician_id,actor_discord_user_id,actor_kind,action,before_snapshot,after_snapshot,interaction_id,result,error_code) VALUES (?,?,?,?,?,?,?,?,?,?)',
-        [uuid(),$id,$actor,$kind,$action,$before===null?null:json($before),$after===null?null:json($after),$interaction,$result,$error]);
+        [$logId,$id,$actor,$kind,$action,$before===null?null:json($before),$after===null?null:json($after),$interaction,$result,$error]);
+    return $logId;
 }
 
 function failure_audit(array $i, string $code): void {
-    try { audit(null,$i['member']['user']['id'] ?? null,($i['data']['name'] ?? '')==='emn-admin'?'operator':'self','profile_update_failed',null,null,$i['id'] ?? null,'rejected',$code); }
+    $operator=($i['data']['name'] ?? '')==='emn-admin' || str_starts_with((string)($i['data']['custom_id'] ?? ''),'audit:');
+    try { audit(null,$i['member']['user']['id'] ?? null,$operator?'operator':'self','profile_update_failed',null,null,$i['id'] ?? null,'rejected',$code); }
     catch (Throwable) { error_log('musicians: failure audit unavailable or duplicate'); }
 }
 
@@ -136,7 +139,7 @@ function ensure_new_interaction(string $id): void {
 
 function public_musician(array $m): array {
     $p = is_string($m['profile']) ? json_decode($m['profile'], true, 32, JSON_THROW_ON_ERROR) : $m['profile'];
-    $result = ['id'=>$m['id'],'slug'=>$m['slug'],'visibility'=>'public','isVerified'=>(bool)$m['is_verified'],'iconStoragePath'=>null,'iconImageSource'=>empty($p['icon_image_url'])?'none':'external_url'];
+    $result = ['id'=>$m['id'],'slug'=>$m['slug'],'visibility'=>'public','iconStoragePath'=>null,'iconImageSource'=>empty($p['icon_image_url'])?'none':'external_url'];
     foreach (['display_name'=>'displayName','name_jp'=>'nameJp','name_en'=>'nameEn','canonical_name'=>'canonicalName','sort_name'=>'sortName','primary_sns_url'=>'primarySnsUrl','website_url'=>'websiteUrl','icon_image_url'=>'iconImageUrl','vrc_name'=>'vrcName','discord_name'=>'discordName'] as $key=>$name) $result[$name] = $p[$key] ?? null;
     $result['roles'] = $p['roles'] ?? [];
     $result['roleChoices']=$p['role_choices'] ?? null;
@@ -153,6 +156,7 @@ function admin_musician(array $m): array {
     $public['visibility']=$m['visibility'];
     $public['version']=(int)$m['version'];
     $public['isLocked']=(bool)$m['is_locked'];
+    $public['isSuspicious']=(bool)$m['is_suspicious'];
     $public['lockedReason']=$m['locked_reason'];
     $public['representativeDiscordUserId']=query('SELECT discord_user_id FROM musician_representatives WHERE musician_id=?',[$m['id']])->fetchColumn() ?: null;
     return $public;

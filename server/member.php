@@ -105,7 +105,7 @@ function member_projection(?array $m): ?array {
 function member_profile_fields(array $input, bool $creating): array {
     $map=['displayName'=>'display_name','nameJp'=>'name_jp','nameEn'=>'name_en','roles'=>'roles',
         'primarySnsUrl'=>'primary_sns_url','websiteUrl'=>'website_url','iconImageUrl'=>'icon_image_url','vrcName'=>'vrc_name','aliases'=>'aliases'];
-    $allowed=array_merge(array_keys($map),['version','links','directoryCategories','slug','otherRole']);
+    $allowed=array_merge(array_keys($map),['version','links','directoryCategories','slug','otherRole','visibility']);
     if (array_diff(array_keys($input),$allowed)) throw new RequestError('unknown_field');
     $values=[];
     foreach ($map as $camel=>$snake) $values[$snake]=$input[$camel] ?? '';
@@ -128,6 +128,12 @@ function member_profile_fields(array $input, bool $creating): array {
     return $profile;
 }
 
+function member_visibility(array $input, string $current): string {
+    $visibility=$input['visibility'] ?? $current;
+    if (!in_array($visibility,['draft','public','hidden'],true)) throw new RequestError('invalid_input');
+    return $visibility;
+}
+
 function save_member_profile(array $session, array $input, bool $confirm=false): array {
     return transaction(function() use ($session,$input,$confirm) {
         member_access($session,true); // Serializes registrations from this Discord user.
@@ -145,11 +151,13 @@ function save_member_profile(array $session, array $input, bool $confirm=false):
                 $owner=query('SELECT id FROM musicians WHERE slug=?',[$slug])->fetchColumn();
                 if ($owner && $owner!==$m['id']) throw new RequestError('slug_conflict',409);
                 $m['slug']=$slug;
+                $m['visibility']=member_visibility($input,$m['visibility']);
                 $m['version']++;
-                query('UPDATE musicians SET slug=?,profile=?,version=? WHERE id=?',[$m['slug'],json($m['profile']),$m['version'],$m['id']]);
+                query('UPDATE musicians SET slug=?,profile=?,visibility=?,version=? WHERE id=?',[$m['slug'],json($m['profile']),$m['visibility'],$m['version'],$m['id']]);
                 query('UPDATE profile_update_sessions SET consumed_at=COALESCE(consumed_at,UTC_TIMESTAMP()) WHERE musician_id=?',[$m['id']]);
             }
-            audit($m['id'],$session['user'],'self',$confirm?'profile_confirmed':'profile_update',$before,snapshot($m),null);
+            $auditId=audit($m['id'],$session['user'],'self',$confirm?'profile_confirmed':'profile_update',$before,snapshot($m),null);
+            if (!$confirm) { $m['audit_id']=$auditId; $m['before']=$before; }
             return $m;
         }
         if ($confirm || ($input['version'] ?? null)!==null) throw new RequestError('member_access_changed',409);
@@ -162,14 +170,42 @@ function save_member_profile(array $session, array $input, bool $confirm=false):
         }
         if (!preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D',$slug)) throw new RequestError('invalid_input');
         $id=uuid();
-        query("INSERT INTO musicians (id,slug,profile,visibility) VALUES (?,?,?,'draft')",[$id,$slug,json($profile)]);
+        query('INSERT INTO musicians (id,slug,profile,visibility) VALUES (?,?,?,?)',[$id,$slug,json($profile),member_visibility($input,'draft')]);
         query('INSERT INTO musician_representatives (musician_id,discord_user_id) VALUES (?,?)',[$id,$session['user']]);
         query('UPDATE member_web_access SET musician_id=? WHERE discord_user_id=?',[$id,$session['user']]);
         $m=musician($id);
         $after=snapshot($m); $after['representative']=$session['user'];
-        audit($id,$session['user'],'self','profile_created',null,$after,null);
+        $m['audit_id']=audit($id,$session['user'],'self','profile_created',null,$after,null);
         audit($id,$session['user'],'self','profile_confirmed',$after,$after,null);
+        $m['before']=null; $m['created']=true;
         return $m;
+    });
+}
+
+// Member's own erasure: profile, assignment, previews and audit history are removed.
+// Only a content-free record of the erasure remains. Files are removed after commit.
+function erase_member_profile(array $session, array $input): array {
+    if (array_diff(array_keys($input),['version']) || !is_int($input['version'] ?? null)) throw new RequestError('invalid_input');
+    return transaction(function() use ($session,$input) {
+        member_access($session,true);
+        $m=member_target($session,true);
+        if (!$m) throw new RequestError('musician_not_found',404);
+        editable($m,$session['user']);
+        if ($input['version']!==(int)$m['version']) throw new RequestError('version_conflict',409);
+        $icons=[icon_key($m['profile']['icon_image_url'] ?? '')];
+        foreach (query('SELECT before_snapshot,after_snapshot FROM musician_audit_logs WHERE musician_id=?',[$m['id']])->fetchAll() as $row) {
+            foreach ([$row['before_snapshot'],$row['after_snapshot']] as $raw) if ($raw) $icons[]=icon_key(json_decode($raw,true)['profile']['icon_image_url'] ?? '');
+        }
+        query('DELETE FROM profile_update_sessions WHERE musician_id=?',[$m['id']]);
+        query('DELETE FROM musician_representatives WHERE musician_id=?',[$m['id']]);
+        query('UPDATE member_web_access SET musician_id=NULL WHERE musician_id=?',[$m['id']]);
+        query('DELETE FROM member_web_access WHERE discord_user_id=?',[$session['user']]);
+        query('SET @emn_erase_musician_id=?',[$m['id']]);
+        try { query('DELETE FROM musician_audit_logs WHERE musician_id=?',[$m['id']]); }
+        finally { query('SET @emn_erase_musician_id=NULL'); }
+        query('DELETE FROM musicians WHERE id=?',[$m['id']]);
+        audit(null,$session['user'],'self','profile_erased',null,null,null);
+        return ['slug'=>$m['slug'],'version'=>'-','visibility'=>'deleted','icons'=>array_values(array_filter($icons))];
     });
 }
 
@@ -189,7 +225,7 @@ function member_http(string $path, string $method): void {
         same_origin(); member_session_end(); response(['ok'=>true]); return;
     }
     $iconRead=str_starts_with($path,'/api/member/icon/');
-    if (!$iconRead && !in_array($path,['/api/member/profile','/api/member/confirm','/api/member/slug','/api/member/icon'],true)) throw new RequestError('not_found',404);
+    if (!$iconRead && !in_array($path,['/api/member/profile','/api/member/confirm','/api/member/slug','/api/member/icon','/api/member/delete'],true)) throw new RequestError('not_found',404);
     member_access($_SESSION);
     rate_limit(($path==='/api/member/slug'?'member-slug:':'member-api:').$_SESSION['user'],$path==='/api/member/slug'?120:30,60);
     $discordMember=require_current_member($_SESSION['user']);
@@ -215,11 +251,19 @@ function member_http(string $path, string $method): void {
         $key=store_icon_upload($_SESSION['user'],$_FILES['image'] ?? []);
         response(['url'=>icon_url($key)]); return;
     }
+    if ($path==='/api/member/delete') {
+        $user=$_SESSION['user'];
+        $erased=erase_member_profile($_SESSION,decode_body(request_body()));
+        member_session_end();
+        erase_icons($user,$erased['icons']);
+        notify_audit('profile_erased',$erased,$user);
+        response(['ok'=>true]); return;
+    }
     if (!in_array($path,['/api/member/profile','/api/member/confirm'],true)) throw new RequestError('method_not_allowed',405);
     $confirm=$path==='/api/member/confirm';
     $m=save_member_profile($_SESSION,decode_body(request_body()),$confirm);
     $_SESSION['musician_id']=$m['id'];
     $user=$_SESSION['user']; session_write_close();
-    notify_audit($confirm?'profile_confirmed':'profile_update',$m,$user);
+    notify_audit($confirm?'profile_confirmed':(($m['created'] ?? false)?'profile_created':'profile_update'),$m,$user,$m['audit_id'] ?? null);
     response(['ok'=>true,'musician'=>member_projection($m)]);
 }

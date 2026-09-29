@@ -88,7 +88,7 @@ if (!$apply) { echo "Dry run only. Re-run with --apply after reviewing the merge
 transaction(function() use ($plan) {
     foreach ($plan as $item) {
         if ($item['existing']) continue;
-        $id=uuid(); query('INSERT INTO musicians (id,slug,profile,visibility,is_verified) VALUES (?,?,?,?,0)',[$id,$item['slug'],json($item['profile']),'draft']);
+        $id=uuid(); query('INSERT INTO musicians (id,slug,profile,visibility) VALUES (?,?,?,?)',[$id,$item['slug'],json($item['profile']),'draft']);
         $m=musician($id); audit($id,null,'system','office_import_merged',null,snapshot($m),null);
     }
 });

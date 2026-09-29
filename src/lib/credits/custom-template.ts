@@ -5,6 +5,7 @@ import {
   type ResolveOptions,
   type ResolvedCreditPerson,
 } from "./selection";
+import { outputIconUrl } from "./guests";
 
 /**
  * Custom Format rendering: SAFE STRING SUBSTITUTION ONLY.
@@ -132,7 +133,7 @@ function resolveFieldFromPerson(
       return person.profileUrl;
     case "image_url":
     case "icon_image_url":
-      return person.iconImageUrl;
+      return outputIconUrl(person.iconImageUrl);
     case "credit_html":
       return buildCreditHtml(person);
     default:

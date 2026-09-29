@@ -4,7 +4,8 @@ CREATE TABLE musicians (
  slug VARCHAR(100) CHARACTER SET ascii COLLATE ascii_bin NOT NULL UNIQUE,
  profile JSON NOT NULL,
  visibility ENUM('draft','public','hidden') NOT NULL DEFAULT 'draft',
- is_verified BOOLEAN NOT NULL DEFAULT FALSE,
+ -- Set by an operator from the audit channel; implies hidden + locked until an operator clears it.
+ is_suspicious BOOLEAN NOT NULL DEFAULT FALSE,
  version INT UNSIGNED NOT NULL DEFAULT 1,
  is_locked BOOLEAN NOT NULL DEFAULT FALSE,
  locked_at DATETIME NULL,
@@ -54,8 +55,16 @@ CREATE TABLE musician_audit_logs (
 
 CREATE TRIGGER audit_no_update BEFORE UPDATE ON musician_audit_logs
  FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Audit logs are append-only';
-CREATE TRIGGER audit_no_delete BEFORE DELETE ON musician_audit_logs
- FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Audit logs are append-only';
+-- The only permitted delete is a member's own erasure request, which sets
+-- @emn_erase_musician_id to that musician inside the erasing transaction.
+DELIMITER //
+CREATE TRIGGER audit_delete_erasure_only BEFORE DELETE ON musician_audit_logs
+ FOR EACH ROW BEGIN
+  IF @emn_erase_musician_id IS NULL OR NOT (OLD.musician_id <=> @emn_erase_musician_id) THEN
+   SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Audit logs are append-only';
+  END IF;
+ END//
+DELIMITER ;
 
 CREATE TABLE rate_limits (
  bucket CHAR(64) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,

@@ -48,7 +48,6 @@ export function AdminMusicianCreateForm({
       vrcName: data.get("vrcName"),
       discordName: data.get("discordName"),
       visibility: data.get("visibility"),
-      isVerified: data.get("isVerified") === "on",
       links: data.get("links"),
     };
 
@@ -143,14 +142,6 @@ export function AdminMusicianCreateForm({
             <option value="hidden">hidden</option>
           </Select>
         </Field>
-        <label className="flex h-10 items-center gap-2 text-sm text-ink">
-          <input
-            type="checkbox"
-            name="isVerified"
-            className="size-4 accent-[var(--color-accent-strong)]"
-          />
-          verified
-        </label>
       </div>
 
       {result ? (

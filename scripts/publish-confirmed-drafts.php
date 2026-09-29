@@ -15,6 +15,7 @@ foreach ($rows as $row) {
     if (!$row['discord_user_id']) $reasons[]='代表者なし';
     if (!$row['confirmed_at'] || strtotime($row['confirmed_at'].' UTC') < strtotime($row['updated_at'].' UTC')) $reasons[]='本人確認なし/確認後に変更あり';
     if ($row['is_locked']) $reasons[]='ロック中';
+    if ($row['is_suspicious']) $reasons[]='不審フラグ';
     foreach (['display_name'=>'表示名','name_jp'=>'日本語名','name_en'=>'英語名'] as $key=>$label) if (trim((string)($profile[$key] ?? ''))==='') $reasons[]=$label.'なし';
     if (empty($profile['roles']) || !is_array($profile['roles'])) $reasons[]='役割なし';
     echo ($reasons?'HOLD ':'READY').$row['slug'].' '.($reasons?implode(' / ',$reasons):'')."\n";

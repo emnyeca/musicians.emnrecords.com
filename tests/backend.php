@@ -82,7 +82,7 @@ admin_mutation($m['id'],'profile-unlock',[],'100000000000000006',interaction()['
 $confirmedProfile=confirm_current_profile($user,interaction()['id']);
 check($confirmedProfile['id']===$m['id'],'self confirmation returns own profile');
 check((bool)query("SELECT id FROM musician_audit_logs WHERE musician_id=? AND action='profile_confirmed' AND actor_kind='self'",[$m['id']])->fetch(),'self confirmation audited');
-$adminInput=['version'=>(int)$confirmedProfile['version'],'slug'=>$slug.'-edited','displayName'=>'管理画面更新','nameJp'=>'管理画面更新','nameEn'=>'Admin Update','roles'=>'Producer, Guitar','primarySnsUrl'=>'https://example.com','websiteUrl'=>'','iconImageUrl'=>'','vrcName'=>'','aliases'=>'旧名','canonicalName'=>'','sortName'=>'','discordName'=>'','visibility'=>'draft','isVerified'=>false,'links'=>'Example | https://example.com','representativeDiscordUserId'=>$user];
+$adminInput=['version'=>(int)$confirmedProfile['version'],'slug'=>$slug.'-edited','displayName'=>'管理画面更新','nameJp'=>'管理画面更新','nameEn'=>'Admin Update','roles'=>'Producer, Guitar','primarySnsUrl'=>'https://example.com','websiteUrl'=>'','iconImageUrl'=>'','vrcName'=>'','aliases'=>'旧名','canonicalName'=>'','sortName'=>'','discordName'=>'','visibility'=>'draft','isSuspicious'=>false,'isLocked'=>false,'links'=>'Example | https://example.com','representativeDiscordUserId'=>$user];
 $adminUpdated=update_musician($m['id'],$adminInput);
 check($adminUpdated['profile']['display_name']==='管理画面更新' && $adminUpdated['visibility']==='draft' && $adminUpdated['slug']===$slug.'-edited','admin editor updates profile and slug');
 check(query('SELECT discord_user_id FROM musician_representatives WHERE musician_id=?',[$m['id']])->fetchColumn()===$user,'admin editor updates representative');
@@ -93,9 +93,10 @@ check((bool)query("SELECT id FROM musician_audit_logs WHERE musician_id=? AND ac
 $s=create_session(interaction(),$user,'basic',$input,null); $before=musician($m['id']);
 try { confirm_session($s['id'],$user,str_repeat('9',81)); throw new RuntimeException('audit failure did not reject'); }
 catch (PDOException) { check(musician($m['id'])['profile']===$before['profile'],'audit failure rolls back profile'); check(live_session($s['id'],$user)['consumed_at']===null,'audit failure rolls back session'); }
-$withdrawn=admin_mutation($m['id'],'profile-withdraw',['confirm'=>true],$user,interaction()['id'],true);
-check($withdrawn['visibility']==='hidden' && (bool)$withdrawn['is_locked'],'withdrawal hides and locks');
-rejects(fn()=>admin_mutation($m['id'],'profile-withdraw',['confirm'=>false],$user,interaction()['id'],true),'invalid_input');
+rejects(fn()=>admin_mutation($m['id'],'profile-hide',[],$user,interaction()['id'],true),'missing_operator_role');
+$suspicious=mark_suspicious($audit['id'],'100000000000000006',interaction()['id']);
+check($suspicious['visibility']==='hidden' && (bool)$suspicious['is_locked'] && (bool)$suspicious['is_suspicious'],'suspicious report hides and locks');
+rejects(fn()=>create_session(interaction(),$user,'basic',$input,null),'musician_locked');
 admin_mutation($m['id'],'representative-revoke',[],'100000000000000006',interaction()['id']);
 rejects(fn()=>own_musician($user),'representative_missing');
 rejects(fn()=>confirm_session($s['id'],$user,interaction()['id']),'session_consumed');
