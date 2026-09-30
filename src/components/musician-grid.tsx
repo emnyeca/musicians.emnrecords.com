@@ -40,11 +40,13 @@ export function MusicianDirectory({ musicians }: { musicians: Musician[] }) {
     useCreditSelections();
   useEffect(() => { refreshFromDirectory(musicians); }, [musicians, refreshFromDirectory]);
 
-  // Most-held tags first among the public profiles; ties alphabetical. "All" stays first (RoleFilter).
+  // Most-held tags first among the public profiles; ties alphabetical.
+  // "All" stays first (RoleFilter) and "Other" always last.
   const allRoles = useMemo(() => {
     const counts = new Map<string, number>();
     for (const m of musicians) for (const role of new Set(m.roleTags ?? roleTags(m.roles))) counts.set(role, (counts.get(role) ?? 0) + 1);
-    return [...counts.keys()].sort((a, b) => counts.get(b)! - counts.get(a)! || a.localeCompare(b));
+    return [...counts.keys()].sort((a, b) =>
+      Number(a === "Other") - Number(b === "Other") || counts.get(b)! - counts.get(a)! || a.localeCompare(b));
   }, [musicians]);
 
   const filtered = useMemo(() => {
