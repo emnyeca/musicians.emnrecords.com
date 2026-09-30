@@ -147,9 +147,9 @@ function handle_discord(array $i, array $actor): array {
     if ($type===3 && preg_match('/^'.SUSPICIOUS_BUTTON.':([a-f0-9-]{36})$/D',$custom,$match)) {
         if (!$actor['operator']) throw new RequestError('missing_operator_role');
         $m=mark_suspicious($match[1],$user,$i['id']);
-        mark_notification_handled($i,'→ 不審な変更として非公開・ロックしました（operator '.$user.'）');
+        mark_notification_handled($i,'→ 念のため非公開にして、本人の編集をロックしました（operator '.$user.'）');
         notify_audit('profile-suspicious',$m,$user);
-        return ephemeral('不審な変更として非公開・ロックしました: '.$m['slug']."\n変更前に戻す場合: /emn-admin profile-restore musician:".$m['slug'].' audit_log:'.$match[1].' state:before'."\n解除は管理画面、または /emn-admin profile-unlock で行ってください。");
+        return ephemeral('念のため非公開にして、本人の編集をロックしました: '.$m['slug']."\n変更前に戻すとき: /emn-admin profile-restore musician:".$m['slug'].' audit_log:'.$match[1].' state:before'."\n問題がなければ、管理画面か /emn-admin profile-unlock でロックを解除できます。");
     }
     if ($type===5) {
         $previous=null; $form='basic';
@@ -246,7 +246,7 @@ function notify_audit(string $action, array $m, string $user, ?string $auditId =
     if (array_key_exists('before',$m)) $content=rtrim($content."\n".snapshot_diff($m['before'],snapshot($m)));
     if (mb_strlen($content,'UTF-8')>1850) $content=mb_substr($content,0,1850,'UTF-8').'…';
     $body=['content'=>$content,'allowed_mentions'=>['parse'=>[]]];
-    if ($auditId!==null) $body['components']=[['type'=>1,'components'=>[['type'=>2,'style'=>4,'label'=>'不審な変更です','custom_id'=>SUSPICIOUS_BUTTON.':'.$auditId]]]];
+    if ($auditId!==null) $body['components']=[['type'=>1,'components'=>[['type'=>2,'style'=>2,'label'=>'気になる変更ならこちら（非公開にしてロックします）','custom_id'=>SUSPICIOUS_BUTTON.':'.$auditId]]]];
     discord_request('POST','/channels/'.rawurlencode($c['discord_audit_channel_id']).'/messages',$body,true);
 }
 
