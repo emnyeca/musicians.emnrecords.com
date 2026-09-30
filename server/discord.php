@@ -233,19 +233,19 @@ function snapshot_diff(?array $before, array $after): string {
             $lines[]=$label.': '.implode(' / ',$parts);
         } else $lines[]=$label.': '.diff_value($old).' → '.diff_value($new);
     }
-    $text=implode("\n",$lines);
-    return mb_strlen($text,'UTF-8')>3900?mb_substr($text,0,3900,'UTF-8').'…':$text;
+    return implode("\n",$lines);
 }
 
 // $auditId is set for a member's own change; operators get a button to stop it.
 function notify_audit(string $action, array $m, string $user, ?string $auditId = null): void {
     $c=config();
     if (empty($c['discord_bot_token']) || empty($c['discord_audit_channel_id'])) return;
-    $body=['content'=>$action.' / '.discord_text($m['slug']).' / actor '.$user.' / version '.$m['version'].' / '.$m['visibility'],'allowed_mentions'=>['parse'=>[]]];
-    if (array_key_exists('before',$m)) {
-        $diff=snapshot_diff($m['before'],snapshot($m));
-        if ($diff!=='') $body['embeds']=[['description'=>$diff]];
-    }
+    // The diff goes in the message text: embeds need the Embed Links permission,
+    // which the audit channel does not grant. Discord caps content at 2000 characters.
+    $content=$action.' / '.discord_text($m['slug']).' / actor '.$user.' / version '.$m['version'].' / '.$m['visibility'];
+    if (array_key_exists('before',$m)) $content=rtrim($content."\n".snapshot_diff($m['before'],snapshot($m)));
+    if (mb_strlen($content,'UTF-8')>1850) $content=mb_substr($content,0,1850,'UTF-8').'…';
+    $body=['content'=>$content,'allowed_mentions'=>['parse'=>[]]];
     if ($auditId!==null) $body['components']=[['type'=>1,'components'=>[['type'=>2,'style'=>4,'label'=>'不審な変更です','custom_id'=>SUSPICIOUS_BUTTON.':'.$auditId]]]];
     discord_request('POST','/channels/'.rawurlencode($c['discord_audit_channel_id']).'/messages',$body,true);
 }
@@ -254,7 +254,7 @@ function notify_audit(string $action, array $m, string $user, ?string $auditId =
 function mark_notification_handled(array $i, string $line): void {
     $channel=$i['channel_id'] ?? $i['message']['channel_id'] ?? ''; $message=$i['message']['id'] ?? '';
     if (!preg_match('/^\d{17,20}$/D',(string)$channel) || !preg_match('/^\d{17,20}$/D',(string)$message)) return;
-    discord_request('PATCH','/channels/'.$channel.'/messages/'.$message,['content'=>mb_substr((string)($i['message']['content'] ?? ''),0,1800,'UTF-8')."\n".$line,'components'=>[],'allowed_mentions'=>['parse'=>[]]],true);
+    discord_request('PATCH','/channels/'.$channel.'/messages/'.$message,['content'=>mb_substr((string)($i['message']['content'] ?? ''),0,1900,'UTF-8')."\n".$line,'components'=>[],'allowed_mentions'=>['parse'=>[]]],true);
 }
 
 function discord_endpoint(): void {
