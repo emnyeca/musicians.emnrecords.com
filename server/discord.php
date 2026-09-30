@@ -186,6 +186,8 @@ function discord_request(string $method, string $path, array $body, bool $bot = 
 }
 
 function discord_get(string $path): array {
+    // Defined only by scripts/local-debug-router.php, which is never deployed.
+    if (function_exists('local_debug_discord_get')) return local_debug_discord_get($path);
     $token=config()['discord_bot_token'] ?? '';
     if ($token==='') throw new RequestError('service_not_configured',503);
     $ch=curl_init('https://discord.com/api/v10'.$path);

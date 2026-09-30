@@ -11,6 +11,8 @@
     "preview": "npm run start",
     "check": "npm run lint && npm run build && npm run test",
     "release:prepare": "npm run build && node scripts/package.mjs",
+    "debug": "npm run build && docker compose --profile debug up -d --build --force-recreate --wait db-debug debug && docker compose exec debug php scripts/local-seed-public.php",
+    "debug:stop": "docker compose --profile debug stop db-debug debug",
     "local:setup": "docker compose build web && node scripts/php.mjs scripts/local-init.php"
   },
   "dependencies": {

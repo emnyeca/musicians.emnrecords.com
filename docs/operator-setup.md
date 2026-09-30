@@ -9,6 +9,15 @@ Dockerは開発用であり、WINGには不要。
 PHP 8.3以降を直接使う場合は、pdo_mysql・mbstring・sodium・curlを有効にし、
 `MUSICIANS_CONFIG` にローカルconfigの絶対パスを指定して `npm start`。
 
+### ローカルデバッグ環境
+
+`npm run debug` で <http://127.0.0.1:8081/__debug/> に確認用の環境を起動する。停止は `npm run debug:stop`。
+
+- 専用の使い捨てDB（`db-debug`）を起動のたびに `schema.sql` から作り、本番の公開API（誰でも見られる情報）からプロフィールをコピーする。本番のDB・Discord・configには接続しない。
+- 設定は `scripts/local-debug-config.php`（ローカル値だけ）。`.local/config.php` は使わない。管理画面のパスワードは `local-debug`。
+- `/__debug/` から任意のプロフィールの本人として、または未登録メンバーとして本人編集を開ける。Discordの在籍・ロール確認だけを `local-debug-router.php` で差し替え、リンク発行・session・CSRF・保存は本番と同じコードを通る。
+- デバッグ用ファイルは `package.mjs` の配布対象に含めない。ポートは127.0.0.1だけで待ち受ける。
+
 ## 公開候補の作成
 
 `npm run check` 後に `npm run release:prepare`。

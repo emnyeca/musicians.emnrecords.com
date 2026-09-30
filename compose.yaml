@@ -41,5 +41,33 @@ services:
     depends_on:
       db:
         condition: service_healthy
+  # Local debug environment (npm run debug): disposable DB, rebuilt from schema.sql on each start.
+  db-debug:
+    image: mysql:8.4
+    profiles: [debug]
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+      MYSQL_DATABASE: musicians_debug
+      MYSQL_USER: musicians
+      MYSQL_PASSWORD: local-debug-only
+    tmpfs: [/var/lib/mysql]
+    volumes:
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 --protocol=TCP --silent"]
+      interval: 3s
+      retries: 40
+  debug:
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile
+    profiles: [debug]
+    working_dir: /app
+    command: php -S 0.0.0.0:8081 -t out scripts/local-debug-router.php
+    ports: ["127.0.0.1:8081:8081"]
+    volumes: [".:/app"]
+    depends_on:
+      db-debug:
+        condition: service_healthy
 volumes:
   mysql-data:

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Musician } from "@/types/musician";
 import { CreditModeToggle } from "@/components/credit-mode-toggle";
 import { MusicianCard } from "@/components/musician-card";
@@ -9,10 +9,21 @@ import { RoleFilter } from "@/components/role-filter";
 import { SelectedCreditBar } from "@/components/selected-credit-bar";
 import { Select } from "./ui/select";
 import { roleTags } from "@/lib/roles";
-import {
-  useCreditMode,
-  useCreditSelections,
-} from "@/lib/credits/use-credit-selections";
+import { useCreditSelections } from "@/lib/credits/use-credit-selections";
+
+/**
+ * Credit mode is not remembered: the directory opens in browsing mode unless the
+ * URL says ?mode=credit (Credit Builder's "名鑑から追加"). The toggle rewrites the
+ * current history entry so reload and back keep the mode of that visit only.
+ */
+function initialCreditMode(): boolean {
+  return typeof window !== "undefined" && new URLSearchParams(window.location.search).get("mode") === "credit";
+}
+function rememberCreditModeInUrl(on: boolean) {
+  const url = new URL(window.location.href);
+  if (on) url.searchParams.set("mode", "credit"); else url.searchParams.delete("mode");
+  window.history.replaceState(window.history.state, "", url);
+}
 
 /**
  * The directory: search, role filter, credit mode and the card grid.
@@ -22,14 +33,18 @@ export function MusicianDirectory({ musicians }: { musicians: Musician[] }) {
   const [query, setQuery] = useState("");
   const [activeRole, setActiveRole] = useState<string | null>(null);
   const [category, setCategory] = useState("musician");
-  const { creditMode, setCreditMode } = useCreditMode();
-  const { selections, isSelected, toggleMusician, clearSelections } =
+  // Rendered only after the client fetch, so reading the URL here cannot mismatch hydration.
+  const [creditMode, setCreditModeState] = useState(initialCreditMode);
+  const setCreditMode = (on: boolean) => { setCreditModeState(on); rememberCreditModeInUrl(on); };
+  const { selections, isSelected, toggleMusician, clearSelections, refreshFromDirectory } =
     useCreditSelections();
+  useEffect(() => { refreshFromDirectory(musicians); }, [musicians, refreshFromDirectory]);
 
+  // Most-held tags first among the public profiles; ties alphabetical. "All" stays first (RoleFilter).
   const allRoles = useMemo(() => {
-    const set = new Set<string>();
-    for (const m of musicians) for (const role of (m.roleTags ?? roleTags(m.roles))) set.add(role);
-    return [...set].sort((a, b) => a.localeCompare(b));
+    const counts = new Map<string, number>();
+    for (const m of musicians) for (const role of new Set(m.roleTags ?? roleTags(m.roles))) counts.set(role, (counts.get(role) ?? 0) + 1);
+    return [...counts.keys()].sort((a, b) => counts.get(b)! - counts.get(a)! || a.localeCompare(b));
   }, [musicians]);
 
   const filtered = useMemo(() => {
