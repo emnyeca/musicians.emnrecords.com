@@ -213,6 +213,23 @@ Modal表示の同期応答とdeferがDiscordの3秒制限内であることは�
 
 導入後、Discord実機で本人限定の返信、共有投稿に個人リンクが出ないこと、保存・監査通知、退会・role削除後の拒否を確認する。ローカル検証ではDiscordへの実送信を行わない。
 
+### バージョン表記とGitタグ
+
+本番へ反映するたびに、バージョンと最終変更の短い名前を更新し、反映したコミットにGitタグを付ける。トップページ最下部に `version 0.1.1 TagOrder` のように小さく表示される。
+
+1. 反映するブランチで `package.json` の `version` と `releaseLabel` を更新する（どちらもこの1か所だけが正本）。
+   - `version`：通常の反映は3桁目を1つ上げる（0.1.1 → 0.1.2）。大きな機能追加や仕様変更で2桁目を上げたいときは本人に確認する。
+   - `releaseLabel`：その反映の主な変更を英語1〜3語のPascalCaseで書く（例：`TagOrder`、`SaveFeedback`）。
+2. mainへ取り込み、mainから公開候補を作って本番へ配置する。
+3. 配置したmainのコミットに注釈付きタグを付けてpushする。
+
+   ```sh
+   git tag -a v0.1.1 -m "TagOrder: タグの並び順・複数選択など"
+   git push origin v0.1.1
+   ```
+
+PHPだけの修正など画面を再ビルドしない反映でも、`package.json` を更新してタグを付ける（表示は次の画面反映から変わる）。
+
 ### 通常の更新
 
 画像・担当選択対応版では`roles.php`、`role-catalog.json`、`icons.php`も非公開領域へ配置する。`preflight.php`でGDの有効化を確認し、PHPの`upload_max_filesize`を5M以上、`post_max_size`を6M以上にする。本番は32M/32Mで確認済み。`musicians-private/icon-storage`はPHPが作成・書き込みできる状態にし、以後の配布で削除しない。バックアップ対象に追加する。ローカルは`docker compose build web`でGD対応イメージを作る。

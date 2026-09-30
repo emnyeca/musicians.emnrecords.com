@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight, Headphones, ListMusic, Music2 } from "lucide-react";
 import { MusicianCount } from "@/components/live-directory";
+import { releaseLabel, version } from "../../package.json";
 
 const discordGuide = "https://emnrecords.com/emn-records-discord-%e4%b8%80%e8%88%ac%e5%85%ac%e9%96%8b%e3%81%ae%e3%81%8a%e7%9f%a5%e3%82%89%e3%81%9b/";
 const uses = [
@@ -59,6 +60,9 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      {/* Release record: package.json version/releaseLabel, updated on every production deploy. */}
+      <p className="text-[11px] text-muted/70">version {version} {releaseLabel}</p>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 {
   "name": "musicians.emnrecords.com",
-  "version": "0.1.0",
+  "version": "0.1.1",
+  "releaseLabel": "TagOrder",
   "private": true,
   "scripts": {
     "dev": "npm run build && docker compose up --build",
