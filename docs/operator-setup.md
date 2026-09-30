@@ -42,6 +42,44 @@ PHP 8.3以降を直接使う場合は、pdo_mysql・mbstring・sodium・curlを�
 公開ディレクトリにはconfig・SQL・バックアップ・開発用ファイルを置かない。
 configの権限は所有者だけが読み書きできる設定を基本とする。
 
+## 本番への接続
+
+このWindows端末ではSSH configを使わず、鍵とポートを毎回指定する。Codex・Claude Codeとも同じ接続方法を使う。2026-09-30に接続確認済み。
+
+- ホスト: `www178.conoha.ne.jp`
+- ユーザー: `c6542929`
+- SSHポート: `8022`
+- 秘密鍵の保存場所: `C:\Users\emnye\Downloads\Musician Directory Deployment.pem`
+- 接続先ホストの確認情報: `C:\Users\emnye\.ssh\known_hosts`
+
+PowerShellからの接続・ファイル転送例:
+
+```powershell
+ssh -o BatchMode=yes -o StrictHostKeyChecking=yes `
+  -i "C:\Users\emnye\Downloads\Musician Directory Deployment.pem" `
+  -p 8022 c6542929@www178.conoha.ne.jp
+
+scp -o BatchMode=yes -o StrictHostKeyChecking=yes `
+  -i "C:\Users\emnye\Downloads\Musician Directory Deployment.pem" `
+  -P 8022 local-file c6542929@www178.conoha.ne.jp:/home/c6542929/musicians-release-backups/
+```
+
+本番の配置先:
+
+- 公開ファイル: `/home/c6542929/public_html/musicians.emnrecords.com/`
+- PHP・config・アップロード画像: `/home/c6542929/musicians-private/`
+- 運用スクリプト: `/home/c6542929/musicians-scripts/`
+- 非公開の作業・バックアップ領域: `/home/c6542929/musicians-release-backups/`
+- PHP CLI: `/opt/alt/php83/usr/bin/php`
+
+接続後の読み取り専用確認:
+
+```sh
+/opt/alt/php83/usr/bin/php /home/c6542929/musicians-scripts/preflight.php
+```
+
+秘密鍵の内容や本番configの秘密値は文書・Git・公開候補へ含めない。既存の`config.php`と`icon-storage/`はコード更新で上書き・削除しない。
+
 ## 実サーバーでの確認
 
 PHP・DB機能は契約環境に依存するため、ローカル成功とWINGでの検証を区別する。
