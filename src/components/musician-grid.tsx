@@ -68,15 +68,17 @@ export function MusicianDirectory({ musicians }: { musicians: Musician[] }) {
     return activeRoles.every((role) => tags.includes(role));
   }), [candidates, activeRoles]);
 
-  // Tags held by more of the profiles on screen come first (ties by name); tags none of
-  // them hold follow. "All" stays first (RoleFilter) and "Other" always last.
+  // Order: All (RoleFilter) → selected tags in the order chosen → tags held by more of the
+  // profiles on screen (ties by name) → tags none of them hold (muted) → "Other" always last.
   const allRoles = useMemo(() => {
     const counts = new Map<string, number>();
     for (const m of musicians) for (const role of m.roleTags ?? roleTags(m.roles)) counts.set(role, 0);
     for (const m of filtered) for (const role of new Set(m.roleTags ?? roleTags(m.roles))) counts.set(role, counts.get(role)! + 1);
+    const rank = (role: string) => { const i = activeRoles.indexOf(role); return i < 0 ? activeRoles.length : i; };
     return [...counts.keys()].sort((a, b) =>
-      Number(a === "Other") - Number(b === "Other") || counts.get(b)! - counts.get(a)! || a.localeCompare(b));
-  }, [musicians, filtered]);
+      Number(a === "Other") - Number(b === "Other") || rank(a) - rank(b)
+      || counts.get(b)! - counts.get(a)! || a.localeCompare(b));
+  }, [musicians, filtered, activeRoles]);
 
   // With AND, adding a tag no profile on screen holds would leave nobody.
   const emptyRoles = useMemo(() => {
