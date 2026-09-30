@@ -31,7 +31,7 @@ function rememberCreditModeInUrl(on: boolean) {
  */
 export function MusicianDirectory({ musicians }: { musicians: Musician[] }) {
   const [query, setQuery] = useState("");
-  const [activeRole, setActiveRole] = useState<string | null>(null);
+  const [activeRoles, setActiveRoles] = useState<string[]>([]);
   const [category, setCategory] = useState("musician");
   // Rendered only after the client fetch, so reading the URL here cannot mismatch hydration.
   const [creditMode, setCreditModeState] = useState(initialCreditMode);
@@ -40,13 +40,13 @@ export function MusicianDirectory({ musicians }: { musicians: Musician[] }) {
     useCreditSelections();
   useEffect(() => { refreshFromDirectory(musicians); }, [musicians, refreshFromDirectory]);
 
-  const filtered = useMemo(() => {
+  // Profiles matching search and category, before the tag filter.
+  const candidates = useMemo(() => {
     const q = query.trim().toLowerCase();
     return musicians.filter((m) => {
       const musician = (m.directoryCategories ?? ["musician"]).includes("musician");
       // Search spans the directory; the initial browsing view focuses on musicians.
       if (!q && !creditMode && category !== "all" && (category === "musician") !== musician) return false;
-      if (activeRole !== null && !(m.roleTags ?? roleTags(m.roles)).includes(activeRole)) return false;
       if (q === "") return true;
       const haystack = [
         m.displayName,
@@ -60,7 +60,13 @@ export function MusicianDirectory({ musicians }: { musicians: Musician[] }) {
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [musicians, query, activeRole, category, creditMode]);
+  }, [musicians, query, category, creditMode]);
+
+  // Selected tags combine with AND; no selection means "All".
+  const filtered = useMemo(() => candidates.filter((m) => {
+    const tags = m.roleTags ?? roleTags(m.roles);
+    return activeRoles.every((role) => tags.includes(role));
+  }), [candidates, activeRoles]);
 
   // Tags held by more of the profiles on screen come first (ties by name); tags none of
   // them hold follow. "All" stays first (RoleFilter) and "Other" always last.
@@ -71,6 +77,12 @@ export function MusicianDirectory({ musicians }: { musicians: Musician[] }) {
     return [...counts.keys()].sort((a, b) =>
       Number(a === "Other") - Number(b === "Other") || counts.get(b)! - counts.get(a)! || a.localeCompare(b));
   }, [musicians, filtered]);
+
+  // With AND, adding a tag no profile on screen holds would leave nobody.
+  const emptyRoles = useMemo(() => {
+    const held = new Set(filtered.flatMap((m) => m.roleTags ?? roleTags(m.roles)));
+    return new Set(allRoles.filter((role) => !held.has(role) && !activeRoles.includes(role)));
+  }, [filtered, allRoles, activeRoles]);
 
   const showBar = creditMode && selections.length > 0;
 
@@ -83,8 +95,9 @@ export function MusicianDirectory({ musicians }: { musicians: Musician[] }) {
         </div>
         <RoleFilter
           roles={allRoles}
-          active={activeRole}
-          onChange={setActiveRole}
+          active={activeRoles}
+          empty={emptyRoles}
+          onChange={setActiveRoles}
         />
         {!creditMode && !query.trim() ? <Select aria-label="名鑑の活動区分" value={category} onChange={(e) => setCategory(e.target.value)}>
           <option value="musician">Musician</option><option value="creator/staff">Creator / Staff</option><option value="all">すべて</option>
