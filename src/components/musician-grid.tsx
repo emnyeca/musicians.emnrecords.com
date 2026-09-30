@@ -40,15 +40,6 @@ export function MusicianDirectory({ musicians }: { musicians: Musician[] }) {
     useCreditSelections();
   useEffect(() => { refreshFromDirectory(musicians); }, [musicians, refreshFromDirectory]);
 
-  // Most-held tags first among the public profiles; ties alphabetical.
-  // "All" stays first (RoleFilter) and "Other" always last.
-  const allRoles = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const m of musicians) for (const role of new Set(m.roleTags ?? roleTags(m.roles))) counts.set(role, (counts.get(role) ?? 0) + 1);
-    return [...counts.keys()].sort((a, b) =>
-      Number(a === "Other") - Number(b === "Other") || counts.get(b)! - counts.get(a)! || a.localeCompare(b));
-  }, [musicians]);
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return musicians.filter((m) => {
@@ -70,6 +61,16 @@ export function MusicianDirectory({ musicians }: { musicians: Musician[] }) {
       return haystack.includes(q);
     });
   }, [musicians, query, activeRole, category, creditMode]);
+
+  // Tags held by more of the profiles on screen come first (ties by name); tags none of
+  // them hold follow. "All" stays first (RoleFilter) and "Other" always last.
+  const allRoles = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const m of musicians) for (const role of m.roleTags ?? roleTags(m.roles)) counts.set(role, 0);
+    for (const m of filtered) for (const role of new Set(m.roleTags ?? roleTags(m.roles))) counts.set(role, counts.get(role)! + 1);
+    return [...counts.keys()].sort((a, b) =>
+      Number(a === "Other") - Number(b === "Other") || counts.get(b)! - counts.get(a)! || a.localeCompare(b));
+  }, [musicians, filtered]);
 
   const showBar = creditMode && selections.length > 0;
 
