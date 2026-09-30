@@ -4,6 +4,7 @@
 本リポジトリのREADMEと `docs/architecture.md` を読む。
 運用先はConoHa WING。公開前の実装・ローカル検証は自律的に進め、本番公開・Discord実送信は本人確認後に行う。
 本番のSSH/SCP接続先・この端末の鍵の保存場所・配置先は `docs/operator-setup.md` の「本番への接続」を参照する。
+本番へ反映するたびに、同じ文書の「バージョン表記とGitタグ」に従ってバージョンを上げ、タグを付ける。
 秘密情報・バックアップをGitや公開候補へ含めない。検証は `npm run check`。
 
 <!-- BEGIN:nextjs-agent-rules -->

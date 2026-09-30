@@ -22,7 +22,9 @@ Next.js / Reactは既存の画面を維持するため、ローカルのビル�
 
 ## ローカル起動
 
-Node.jsとDocker Desktopを使います。Windows PowerShellでnpmが実行制限される場合は `npm.cmd` を使ってください。
+画面を試すだけなら、本番と同じ画面をこのPCだけで動かせる「ローカルデバッグ環境」（`npm.cmd run debug`）が簡単です。起動手順は [docs/operator-setup.md の「ローカルデバッグ環境」](docs/operator-setup.md#ローカルデバッグ環境) にあります。
+
+以下は開発用の環境です。Node.jsとDocker Desktopを使います。Windows PowerShellでnpmが実行制限される場合は `npm.cmd` を使ってください。
 
 ```sh
 npm ci

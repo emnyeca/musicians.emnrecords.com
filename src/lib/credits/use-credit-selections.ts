@@ -113,12 +113,6 @@ export function useSavedGuests() {
   return { guests, saveGuest, deleteGuest };
 }
 
-const modeStore = createLocalStore<boolean>(
-  "emn.credit.mode.v1",
-  false,
-  (value) => (typeof value === "boolean" ? value : null),
-);
-
 const templateStore = createLocalStore<CreditCustomTemplate>(
   "emn.credit.customTemplate.v1",
   DEFAULT_CUSTOM_TEMPLATE,
@@ -199,6 +193,24 @@ export function useCreditSelections() {
     );
   }, []);
 
+  /**
+   * Directory people follow the latest public profile (icon, links, names).
+   * Temporary overrides and guests are left as they are.
+   */
+  const refreshFromDirectory = useCallback((musicians: Musician[]) => {
+    const latest = new Map(musicians.map((m) => [m.id, m]));
+    const stale = (s: CreditSelection) => {
+      const m = s.sourceKind === "guest" ? undefined : latest.get(s.musicianId);
+      return m !== undefined && JSON.stringify(m) !== JSON.stringify(s.sourceMusician);
+    };
+    if (!selectionsStore.getSnapshot().some(stale)) return;
+    selectionsStore.update((prev) => prev.map((s) => {
+      if (!stale(s)) return s;
+      const m = latest.get(s.musicianId)!;
+      return { ...s, slug: m.slug, sourceMusician: m };
+    }));
+  }, []);
+
   const clearSelections = useCallback(() => {
     selectionsStore.update(() => []);
   }, []);
@@ -251,19 +263,8 @@ export function useCreditSelections() {
     move,
     patchSelection,
     resetOverrides,
+    refreshFromDirectory,
   };
-}
-
-export function useCreditMode() {
-  const creditMode = useSyncExternalStore(
-    modeStore.subscribe,
-    modeStore.getSnapshot,
-    modeStore.getServerSnapshot,
-  );
-  const setCreditMode = useCallback((on: boolean) => {
-    modeStore.update(() => on);
-  }, []);
-  return { creditMode, setCreditMode };
 }
 
 export function useCustomTemplate() {

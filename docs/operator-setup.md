@@ -9,6 +9,59 @@ Dockerは開発用であり、WINGには不要。
 PHP 8.3以降を直接使う場合は、pdo_mysql・mbstring・sodium・curlを有効にし、
 `MUSICIANS_CONFIG` にローカルconfigの絶対パスを指定して `npm start`。
 
+### ローカルデバッグ環境
+
+本番と同じ画面を、このPCの中だけで試せる環境。本番のデータを壊す心配はなく、ここで保存・削除しても本番には何も起きない。
+
+#### 起動のしかた
+
+1. **Docker Desktopを起動する。** スタートメニューから「Docker Desktop」を開き、画面左下が緑色（Engine running）になるまで待つ（1分ほど）。
+2. **VS Codeでこのフォルダを開き、ターミナルを開く。** メニューの「ターミナル」→「新しいターミナル」（または `Ctrl` + `@`）。
+3. **初めてのときだけ**、次を入力して `Enter`。必要な部品をダウンロードする（数分かかる）。
+
+   ```powershell
+   npm.cmd ci
+   ```
+
+4. 次を入力して `Enter`。2〜3分かかる。
+
+   ```powershell
+   npm.cmd run debug
+   ```
+
+   最後に `Copied 3 public profiles ... into the local debug DB.` のような行が出たら起動完了（数字は公開中の人数）。
+5. ブラウザで <http://127.0.0.1:8081/__debug/> を開く。
+
+#### できること
+
+- 「サイトを開く」：名鑑・クレジット作成を本番と同じ画面で試せる。
+- 人の名前をクリック：その人の本人編集画面が開く（Discordのボタンを押したときと同じ画面）。
+- 「未登録メンバーとして本人編集を開く」：新規登録の画面を試せる。
+- 「管理画面」：パスワードは `local-debug`。
+
+データは起動するたびに本番の公開中プロフィールからコピーし直す。試しに変えた内容は、次に起動すると元に戻る。
+
+#### 終わるとき
+
+ターミナルで次を実行する。Docker Desktopは閉じてもよい。
+
+```powershell
+npm.cmd run debug:stop
+```
+
+#### うまくいかないとき
+
+- `failed to connect to the docker API` と出る：Docker Desktopが起動していない。手順1からやり直す。
+- `npm` が「スクリプトの実行が無効」と言われる：コマンドの `npm` を `npm.cmd` にする（上の手順は `npm.cmd` で書いてある）。
+- ページが開かない：手順4の完了メッセージが出ているか確認し、出ていなければ `npm.cmd run debug` をもう一度実行する。
+
+#### 仕組み（開発者向け）
+
+- 専用の使い捨てDB（`db-debug`）を起動のたびに `schema.sql` から作り、本番の公開API（誰でも見られる情報）からプロフィールをコピーする。本番のDB・Discord・configには接続しない。
+- 設定は `scripts/local-debug-config.php`（ローカル値だけ）。`.local/config.php` は使わない。管理画面のパスワードは `local-debug`。
+- `/__debug/` から任意のプロフィールの本人として、または未登録メンバーとして本人編集を開ける。Discordの在籍・ロール確認だけを `local-debug-router.php` で差し替え、リンク発行・session・CSRF・保存は本番と同じコードを通る。
+- デバッグ用ファイルは `package.mjs` の配布対象に含めない。ポートは127.0.0.1だけで待ち受ける。
+
 ## 公開候補の作成
 
 `npm run check` 後に `npm run release:prepare`。
@@ -159,6 +212,23 @@ Modal表示の同期応答とdeferがDiscordの3秒制限内であることは�
 公開状態は本人がWeb画面で選ぶ。掲載を辞退する場合は「非公開」を選んで保存する。
 
 導入後、Discord実機で本人限定の返信、共有投稿に個人リンクが出ないこと、保存・監査通知、退会・role削除後の拒否を確認する。ローカル検証ではDiscordへの実送信を行わない。
+
+### バージョン表記とGitタグ
+
+本番へ反映するたびに、バージョンと最終変更の短い名前を更新し、反映したコミットにGitタグを付ける。トップページ最下部に `version 0.1.1 TagOrder` のように小さく表示される。
+
+1. 反映するブランチで `package.json` の `version` と `releaseLabel` を更新する（どちらもこの1か所だけが正本）。
+   - `version`：通常の反映は3桁目を1つ上げる（0.1.1 → 0.1.2）。大きな機能追加や仕様変更で2桁目を上げたいときは本人に確認する。
+   - `releaseLabel`：その反映の主な変更を英語1〜3語のPascalCaseで書く（例：`TagOrder`、`SaveFeedback`）。
+2. mainへ取り込み、mainから公開候補を作って本番へ配置する。
+3. 配置したmainのコミットに注釈付きタグを付けてpushする。
+
+   ```sh
+   git tag -a v0.1.1 -m "TagOrder: タグの並び順・複数選択など"
+   git push origin v0.1.1
+   ```
+
+PHPだけの修正など画面を再ビルドしない反映でも、`package.json` を更新してタグを付ける（表示は次の画面反映から変わる）。
 
 ### 通常の更新
 
