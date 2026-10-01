@@ -1,4 +1,5 @@
 "use client";
+import { useTranslation } from "@/lib/i18n";
 
 import { useState, type FormEvent } from "react";
 import { Lock, LogOut } from "lucide-react";
@@ -21,6 +22,7 @@ export function PasswordGate({
   description: string;
   footer?: string;
 }) {
+  const t = useTranslation();
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -62,22 +64,22 @@ export function PasswordGate({
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="共通パスワード"
+          placeholder={t("共通パスワード")}
           autoFocus
           autoComplete="current-password"
         />
-        {error ? <p className="text-xs text-red-600">{error}</p> : null}
+        {error ? <p className="text-xs text-red-600">{t(error)}</p> : null}
         <Button
           type="submit"
           variant="solid"
           disabled={submitting || password === ""}
         >
-          {submitting ? "確認中…" : "開く"}
+          {submitting ? t("確認中…") : t("開く")}
         </Button>
       </form>
       <p className="text-center text-[11px] leading-relaxed text-muted">
         {footer ??
-          "パスワードはEMN Recordsの確認済みメンバー向けDiscordチャンネルで共有されています。"}
+          t("パスワードはEMN Recordsの確認済みメンバー向けDiscordチャンネルで共有されています。")}
       </p>
     </div>
   );
@@ -85,6 +87,7 @@ export function PasswordGate({
 
 /** Clears the access cookie for the given endpoint and refreshes the page. */
 export function AccessLogoutButton({ endpoint }: { endpoint: string }) {
+  const t = useTranslation();
   const [busy, setBusy] = useState(false);
 
   async function logout() {
@@ -99,7 +102,6 @@ export function AccessLogoutButton({ endpoint }: { endpoint: string }) {
   return (
     <Button variant="ghost" size="sm" onClick={logout} disabled={busy}>
       <LogOut className="size-3.5" />
-      アクセスを終了
-    </Button>
+      {t("アクセスを終了")}</Button>
   );
 }

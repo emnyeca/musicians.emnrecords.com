@@ -69,8 +69,8 @@ export function resolveCreditPerson(
 
   return {
     slug: selection.slug,
-    nameJp: selection.overrideNameJp ?? m.nameJp,
-    nameEn: selection.overrideNameEn ?? m.nameEn,
+    nameJp: selection.overrideNameJp ?? (m.nameJp || selection.overrideDisplayName || m.displayName),
+    nameEn: selection.overrideNameEn ?? (m.nameEn || selection.overrideDisplayName || m.displayName),
     displayName: selection.overrideDisplayName ?? m.displayName,
     canonicalName: selection.sourceKind === "guest" ? selection.overrideDisplayName ?? m.displayName : m.canonicalName ?? m.nameEn,
     role: selection.overrideRole ?? m.roles[0] ?? "",

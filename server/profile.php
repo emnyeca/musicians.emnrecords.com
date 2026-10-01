@@ -45,7 +45,7 @@ function validate_fields(array $fields): array {
             'roles' => list_value($v, 40, true,30),
             'aliases' => list_value($v, 80),
             'primary_sns_url','website_url','icon_image_url' => url_value($v),
-            default => text_value($v, 80, in_array($k, ['display_name','name_jp','name_en'], true)),
+            default => text_value($v, 80, in_array($k, ['display_name','name_en'], true)),
         };
     }
     return $fields;

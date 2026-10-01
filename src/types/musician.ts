@@ -35,7 +35,7 @@ export type Musician = {
   slug: string;
   /** Name mainly shown on cards and lists. */
   displayName: string;
-  /** Japanese name. The only field that is intentionally Japanese. */
+  /** Optional Japanese name; blank if the artist does not use one. */
   nameJp: string;
   /** English name. Everything except nameJp is English-first. */
   nameEn: string;
@@ -91,6 +91,9 @@ export type CreditGuest = {
 };
 
 export type CreditOutputFormat =
+  | "english_minimal" | "english_names" | "english_roles" | "english_links" | "english_full"
+  | "english_markdown" | "english_discord" | "english_html"
+  | "japanese_names" | "japanese_roles" | "bilingual"
   | "emn_minimal"
   | "wordpress_html"
   | "markdown"

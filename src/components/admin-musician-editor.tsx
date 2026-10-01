@@ -1,4 +1,5 @@
 "use client";
+import { useTranslation } from "@/lib/i18n";
 
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ function stateFrom(m: AdminMusician): EditorState {
 }
 
 export function AdminMusicianEditor() {
+  const t = useTranslation();
   const [musicians,setMusicians]=useState<AdminMusician[]>([]);
   const [selectedId,setSelectedId]=useState("");
   const [form,setForm]=useState<EditorState | null>(null);
@@ -63,7 +65,7 @@ export function AdminMusicianEditor() {
       setSelectedId(id);
       const current=data.musicians.find((m)=>m.id===id) ?? data.musicians[0];
       setForm(current?stateFrom(current):null);
-      setStatus(`${data.musicians.length}名`);
+      setStatus(String(data.musicians.length));
     } catch { setStatus("一覧を取得できませんでした。"); }
   }
   useEffect(()=>{
@@ -73,7 +75,7 @@ export function AdminMusicianEditor() {
       setMusicians(data.musicians);
       const current=data.musicians[0];
       if(current){setSelectedId(current.id);setForm(stateFrom(current));}
-      setStatus(`${data.musicians.length}名`);
+      setStatus(String(data.musicians.length));
     }).catch(()=>setStatus("一覧を取得できませんでした。"));
   },[]);
 
@@ -83,7 +85,7 @@ export function AdminMusicianEditor() {
     return (visibility==="all" || m.visibility===visibility) &&
       (!needle || [m.displayName,m.nameJp,m.nameEn,m.slug,...m.aliases].join(" ").toLowerCase().includes(needle));
   }),[musicians,query,visibility]);
-  function choose(m:AdminMusician){setSelectedId(m.id);setForm(stateFrom(m));setStatus(`${musicians.length}名`);}
+  function choose(m:AdminMusician){setSelectedId(m.id);setForm(stateFrom(m));setStatus(String(musicians.length));}
   function set<K extends keyof EditorState>(key:K,value:EditorState[K]){setForm((old)=>old?{...old,[key]:value}:old);}
 
   async function save(event:FormEvent){
@@ -104,15 +106,15 @@ export function AdminMusicianEditor() {
 
   return <div className="grid gap-6 lg:grid-cols-[18rem_1fr]">
     <aside className="flex flex-col gap-3">
-      <div className="flex gap-2"><Input aria-label="検索" placeholder="名前・slugで検索" value={query} onChange={(e)=>setQuery(e.target.value)}/>
-        <Button type="button" variant="outline" onClick={()=>void load()}>更新</Button></div>
-      <Select aria-label="公開状態" value={visibility} onChange={(e)=>setVisibility(e.target.value as typeof visibility)}>
-        <option value="all">すべて</option><option value="draft">draft</option><option value="public">public</option><option value="hidden">hidden</option>
+      <div className="flex gap-2"><Input aria-label={t("検索")} placeholder={t("名前・slugで検索")} value={query} onChange={(e)=>setQuery(e.target.value)}/>
+        <Button type="button" variant="outline" onClick={()=>void load()}>{t("更新")}</Button></div>
+      <Select aria-label={t("公開状態")} value={visibility} onChange={(e)=>setVisibility(e.target.value as typeof visibility)}>
+        <option value="all">{t("すべて")}</option><option value="draft">draft</option><option value="public">public</option><option value="hidden">hidden</option>
       </Select>
-      <p className="text-xs text-muted">{status} / 表示 {filtered.length}名</p>
+      <p className="text-xs text-muted">{t(status)} {t("/ 表示")}{filtered.length}{t("名")}</p>
       <div className="max-h-[65vh] overflow-y-auto rounded border border-line">
         {filtered.map((m)=><button key={m.id} type="button" onClick={()=>choose(m)} className={`block w-full border-b border-line px-3 py-2 text-left text-sm last:border-0 ${m.id===selectedId?"bg-accent-soft":"hover:bg-surface"}`}>
-          <span className="block font-medium">{m.displayName || "(名称未設定)"}</span>
+          <span className="block font-medium">{m.displayName || t("(名称未設定)")}</span>
           <span className="block text-xs text-muted">{m.slug} · {m.visibility}{m.isLocked?" · locked":""}{m.isSuspicious?" · suspicious":""}</span>
         </button>)}
       </div>
@@ -121,35 +123,35 @@ export function AdminMusicianEditor() {
       <div><h3 className="font-semibold">{selected.displayName}</h3><p className="break-all text-xs text-muted">version {selected.version}</p></div>
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="slug *"><Input required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" value={form.slug} onChange={(e)=>set("slug",e.target.value.toLowerCase())}/></Field>
-        <Field label="表示名 *"><Input required value={form.displayName} onChange={(e)=>set("displayName",e.target.value)}/></Field>
-        <Field label="日本語名 *"><Input required value={form.nameJp} onChange={(e)=>set("nameJp",e.target.value)}/></Field>
-        <Field label="英語名 *"><Input required value={form.nameEn} onChange={(e)=>set("nameEn",e.target.value)}/></Field>
-        <Field label="正規名"><Input value={form.canonicalName} onChange={(e)=>set("canonicalName",e.target.value)}/></Field>
-        <Field label="並び順名"><Input value={form.sortName} onChange={(e)=>set("sortName",e.target.value)}/></Field>
-        <Field label="別名（カンマ区切り）"><Input value={form.aliases} onChange={(e)=>set("aliases",e.target.value)}/></Field>
+        <Field label={t("表示名 *")}><Input required value={form.displayName} onChange={(e)=>set("displayName",e.target.value)}/></Field>
+        <Field label={t("日本語名（任意）")}><Input value={form.nameJp} onChange={(e)=>set("nameJp",e.target.value)}/></Field>
+        <Field label={t("英語名 *")}><Input required value={form.nameEn} onChange={(e)=>set("nameEn",e.target.value)}/></Field>
+        <Field label={t("正規名")}><Input value={form.canonicalName} onChange={(e)=>set("canonicalName",e.target.value)}/></Field>
+        <Field label={t("並び順名")}><Input value={form.sortName} onChange={(e)=>set("sortName",e.target.value)}/></Field>
+        <Field label={t("別名（カンマ区切り）")}><Input value={form.aliases} onChange={(e)=>set("aliases",e.target.value)}/></Field>
       </div>
       <RolePicker roles={form.roles} otherRole={form.otherRole} onChange={(roles, otherRole) => setForm((old) => old ? {...old, roles, otherRole} : old)} />
-      <Field label="名鑑の活動区分"><Select value={form.directoryCategories.includes("musician") ? "musician" : "creator/staff"} onChange={(e)=>set("directoryCategories",[e.target.value as DirectoryCategory])}>
-        <option value="musician">Musician（演奏・歌唱・作曲など）</option><option value="creator/staff">Creator / Staff（Musician以外）</option>
+      <Field label={t("名鑑の活動区分")}><Select value={form.directoryCategories.includes("musician") ? "musician" : "creator/staff"} onChange={(e)=>set("directoryCategories",[e.target.value as DirectoryCategory])}>
+        <option value="musician">{t("Musician（演奏・歌唱・作曲など）")}</option><option value="creator/staff">{t("Creator / Staff（Musician以外）")}</option>
       </Select></Field>
-      <p className="text-xs text-muted">兼業の方はMusicianを選び、具体的な活動は担当へ記入してください。外部コラボレーターは名鑑に公開せず、クレジットのゲスト追加を利用します。</p>
+      <p className="text-xs text-muted">{t("兼業の方はMusicianを選び、具体的な活動は担当へ記入してください。外部コラボレーターは名鑑に公開せず、クレジットのゲスト追加を利用します。")}</p>
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="主SNS URL"><Input type="url" value={form.primarySnsUrl} onChange={(e)=>set("primarySnsUrl",e.target.value)}/></Field>
+        <Field label={t("主SNS URL")}><Input type="url" value={form.primarySnsUrl} onChange={(e)=>set("primarySnsUrl",e.target.value)}/></Field>
         <Field label="Web URL"><Input type="url" value={form.websiteUrl} onChange={(e)=>set("websiteUrl",e.target.value)}/></Field>
-        <Field label="アイコンURL"><Input type="url" value={form.iconImageUrl} onChange={(e)=>set("iconImageUrl",e.target.value)}/></Field>
-        <Field label="VRChat名"><Input value={form.vrcName} onChange={(e)=>set("vrcName",e.target.value)}/></Field>
-        <Field label="Discord名"><Input value={form.discordName} onChange={(e)=>set("discordName",e.target.value)}/></Field>
-        <Field label="代表者DiscordユーザーID"><Input inputMode="numeric" pattern="[0-9]{17,20}" placeholder="空欄で紐付け解除" value={form.representativeDiscordUserId} onChange={(e)=>set("representativeDiscordUserId",e.target.value.trim())}/></Field>
+        <Field label={t("アイコンURL")}><Input type="url" value={form.iconImageUrl} onChange={(e)=>set("iconImageUrl",e.target.value)}/></Field>
+        <Field label={t("VRChat名")}><Input value={form.vrcName} onChange={(e)=>set("vrcName",e.target.value)}/></Field>
+        <Field label={t("Discord名")}><Input value={form.discordName} onChange={(e)=>set("discordName",e.target.value)}/></Field>
+        <Field label={t("代表者DiscordユーザーID")}><Input inputMode="numeric" pattern="[0-9]{17,20}" placeholder={t("空欄で紐付け解除")} value={form.representativeDiscordUserId} onChange={(e)=>set("representativeDiscordUserId",e.target.value.trim())}/></Field>
       </div>
-      <Field label="追加リンク（ラベル | URL、1行1件）"><Textarea rows={5} value={form.links} onChange={(e)=>set("links",e.target.value)}/></Field>
+      <Field label={t("追加リンク（ラベル | URL、1行1件）")}><Textarea rows={5} value={form.links} onChange={(e)=>set("links",e.target.value)}/></Field>
       <div className="flex flex-wrap items-center gap-4">
-        <Field label="公開状態"><Select value={form.visibility} onChange={(e)=>set("visibility",e.target.value as MusicianVisibility)}><option value="draft">draft</option><option value="public">public</option><option value="hidden">hidden</option></Select></Field>
+        <Field label={t("公開状態")}><Select value={form.visibility} onChange={(e)=>set("visibility",e.target.value as MusicianVisibility)}><option value="draft">draft</option><option value="public">public</option><option value="hidden">hidden</option></Select></Field>
         <label className="mt-6 flex items-center gap-2 text-sm"><input type="checkbox" checked={form.isSuspicious} onChange={(e)=>set("isSuspicious",e.target.checked)}/> suspicious</label>
-        <label className="mt-6 flex items-center gap-2 text-sm"><input type="checkbox" checked={form.isLocked} onChange={(e)=>set("isLocked",e.target.checked)}/> 本人の編集をロック</label>
-        {selected.isLocked?<span className="mt-6 text-sm text-red-700">ロック中: {selected.lockedReason}</span>:null}
+        <label className="mt-6 flex items-center gap-2 text-sm"><input type="checkbox" checked={form.isLocked} onChange={(e)=>set("isLocked",e.target.checked)}/> {t("本人の編集をロック")}</label>
+        {selected.isLocked?<span className="mt-6 text-sm text-red-700">{t("ロック中:")}{selected.lockedReason}</span>:null}
       </div>
-      <div><Button type="submit" variant="solid" disabled={saving}>{saving?"保存中…":"変更を保存"}</Button></div>
-    </form>:<p>対象を選択してください。</p>}
+      <div><Button type="submit" variant="solid" disabled={saving}>{saving?t("保存中…"):t("変更を保存")}</Button></div>
+    </form>:<p>{t("対象を選択してください。")}</p>}
   </div>;
 }
 

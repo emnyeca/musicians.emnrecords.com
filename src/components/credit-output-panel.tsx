@@ -1,4 +1,5 @@
 "use client";
+import { useTranslation } from "@/lib/i18n";
 
 import { useMemo } from "react";
 import { Download } from "lucide-react";
@@ -26,6 +27,7 @@ export function CreditOutputPanel({
   template: CreditCustomTemplate;
   onTemplateChange: (patch: Partial<CreditCustomTemplate>) => void;
 }) {
+  const t = useTranslation();
   const { format, setFormat } = useCreditFormat();
 
   const result = useMemo(
@@ -56,23 +58,32 @@ export function CreditOutputPanel({
           htmlFor="credit-format"
           className="text-xs font-medium text-muted"
         >
-          出力形式
-        </label>
+          {t("出力形式")}</label>
         <Select
           id="credit-format"
+          className="w-full min-w-0"
           value={format}
           onChange={(e) => setFormat(e.target.value)}
         >
-          {CREDIT_FORMAT_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
+          <option value="custom">Custom Format</option>
+          {([ ["japanese", "日本語名・日英併記"], ["english", "英語名"], ["publishing", "投稿・データ形式"] ] as const).map(([group, label]) => (
+            <optgroup key={group} label={t(label)}>
+              {CREDIT_FORMAT_OPTIONS.filter((option) => option.group === group).map((option) => (
+                <option key={option.value} value={option.value}>{t(option.label)}</option>
+              ))}
+            </optgroup>
           ))}
         </Select>
         {activeOption ? (
-          <p className="text-[11px] text-muted">{activeOption.description}</p>
+          <p className="text-[11px] text-muted">{t(activeOption.description)}</p>
         ) : null}
       </div>
+
+      {activeOption?.template && <Button variant="ghost" size="sm" onClick={() => {
+        onTemplateChange({ headerTemplate: "", footerTemplate: "", ...activeOption.template! });
+        setFormat("custom");
+      }}>{t("このテンプレートをカスタマイズ")}</Button>}
+      <p className="text-xs text-muted">{t("名前の表記が未登録の場合は表示名を使います。表示言語の切替では出力形式は変わりません。")}</p>
 
       {format === "custom" ? (
         <CustomFormatEditor template={template} onChange={onTemplateChange} />
@@ -98,8 +109,8 @@ export function CreditOutputPanel({
       <div className="flex flex-wrap gap-2">
         <CopyButton
           text={result.output}
-          label="コピー"
-          copiedLabel="コピーしました"
+          label={t("コピー")}
+          copiedLabel={t("コピーしました")}
           variant="solid"
           disabled={selections.length === 0}
         />
@@ -109,8 +120,7 @@ export function CreditOutputPanel({
           disabled={selections.length === 0}
         >
           <Download className="size-3.5" />
-          ダウンロード
-        </Button>
+          {t("ダウンロード")}</Button>
       </div>
     </div>
   );

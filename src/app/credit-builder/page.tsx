@@ -1,3 +1,4 @@
+import { TranslatedText } from "@/lib/i18n";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -22,8 +23,7 @@ export default function CreditBuilderPage() {
         </Link>
         <h1 className="text-xl font-semibold tracking-tight">Credit Builder</h1>
         <p className="text-sm text-muted">
-          出演者・スタッフ・ゲストを選び、イベント用のクレジットを作成します。
-        </p>
+          <TranslatedText text="出演者・スタッフ・ゲストを選び、イベント用のクレジットを作成します。" /></p>
       </div>
       <CreditBuilderForm />
     </div>
