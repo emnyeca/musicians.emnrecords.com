@@ -1,4 +1,5 @@
 "use client";
+import { useTranslation } from "@/lib/i18n";
 
 import type { CreditCustomTemplate } from "@/types/musician";
 import { Input } from "@/components/ui/input";
@@ -18,12 +19,12 @@ export function CustomFormatEditor({
   template: CreditCustomTemplate;
   onChange: (patch: Partial<CreditCustomTemplate>) => void;
 }) {
+  const t = useTranslation();
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1">
         <Label htmlFor="custom-person-template">
-          Person template（1人分の出力）
-        </Label>
+          {t("Person template（1人分の出力）")}</Label>
         <Textarea
           id="custom-person-template"
           rows={4}
@@ -37,8 +38,7 @@ export function CustomFormatEditor({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1">
           <Label htmlFor="custom-separator">
-            Separator（人と人の区切り、\n = 改行）
-          </Label>
+            {t("Separator（人と人の区切り、\\n = 改行）")}</Label>
           <Input
             id="custom-separator"
             value={escapeSeparator(template.separator)}
@@ -49,7 +49,7 @@ export function CustomFormatEditor({
           />
         </div>
         <div className="flex flex-col gap-1">
-          <Label htmlFor="custom-header">Header（先頭に1回）</Label>
+          <Label htmlFor="custom-header">{t("Header（先頭に1回）")}</Label>
           <Input
             id="custom-header"
             value={template.headerTemplate ?? ""}
@@ -61,7 +61,7 @@ export function CustomFormatEditor({
       </div>
 
       <div className="flex flex-col gap-1">
-        <Label htmlFor="custom-footer">Footer（末尾に1回）</Label>
+        <Label htmlFor="custom-footer">{t("Footer（末尾に1回）")}</Label>
         <Input
           id="custom-footer"
           value={template.footerTemplate ?? ""}
@@ -73,8 +73,7 @@ export function CustomFormatEditor({
 
       <details className="rounded-md border border-line bg-surface p-3">
         <summary className="cursor-pointer text-xs font-medium text-muted">
-          使用できるプレースホルダー
-        </summary>
+          {t("使用できるプレースホルダー")}</summary>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {[...allowedPlaceholders].map((name) => (
             <code

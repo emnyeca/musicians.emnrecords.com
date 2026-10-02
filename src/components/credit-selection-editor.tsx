@@ -1,4 +1,5 @@
 "use client";
+import { useTranslation } from "@/lib/i18n";
 
 import { useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, Pencil, Trash2 } from "lucide-react";
@@ -48,6 +49,7 @@ export function CreditSelectionEditor({
   onPatch: (musicianId: string, patch: Partial<CreditSelection>) => void;
   onReset: (musicianId: string) => void;
 }) {
+  const t = useTranslation();
   const [open, setOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
   const { guests, saveGuest } = useSavedGuests();
@@ -71,13 +73,13 @@ export function CreditSelectionEditor({
     label: string;
     baseValue: string;
   }[] = [
-    { key: "overrideNameJp", label: "名前（日） / name_jp", baseValue: baseline.nameJp },
-    { key: "overrideNameEn", label: "名前（英） / name_en", baseValue: baseline.nameEn },
-    { key: "overrideDisplayName", label: "表示名 / display_name", baseValue: baseline.displayName },
-    { key: "overrideRole", label: "担当 / role", baseValue: baseline.role },
-    { key: "overrideLinkPrimary", label: "リンク1 / link_primary", baseValue: baseline.linkPrimary },
-    { key: "overrideLinkSecondary", label: "リンク2 / link_secondary", baseValue: baseline.linkSecondary },
-    { key: "overrideIconImageUrl", label: "アイコンURL / icon_image_url", baseValue: baseline.iconImageUrl },
+    { key: "overrideNameJp", label: t("名前（日） / name_jp"), baseValue: baseline.nameJp },
+    { key: "overrideNameEn", label: t("名前（英） / name_en"), baseValue: baseline.nameEn },
+    { key: "overrideDisplayName", label: t("表示名 / display_name"), baseValue: baseline.displayName },
+    { key: "overrideRole", label: t("担当 / role"), baseValue: baseline.role },
+    { key: "overrideLinkPrimary", label: t("リンク1 / link_primary"), baseValue: baseline.linkPrimary },
+    { key: "overrideLinkSecondary", label: t("リンク2 / link_secondary"), baseValue: baseline.linkSecondary },
+    { key: "overrideIconImageUrl", label: t("アイコンURL / icon_image_url"), baseValue: baseline.iconImageUrl },
   ];
 
   const effective = resolveCreditPerson(selection);
@@ -107,11 +109,10 @@ export function CreditSelectionEditor({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-ink">
             {effective.displayName}
-            {selection.sourceKind === "guest" && <span className="ml-2 text-xs text-muted">ゲスト</span>}
+            {selection.sourceKind === "guest" && <span className="ml-2 text-xs text-muted">{t("ゲスト")}</span>}
             {edited ? (
               <span className="ml-2 rounded bg-accent-soft px-1.5 py-0.5 text-[10px] text-accent-strong">
-                一時編集あり
-              </span>
+                {t("一時編集あり")}</span>
             ) : null}
           </p>
           <p className="truncate text-xs text-muted">{effective.role}</p>
@@ -161,9 +162,7 @@ export function CreditSelectionEditor({
       {open ? (
         <div className="border-t border-line p-3">
           <p className="mb-3 text-[11px] leading-relaxed text-muted">
-            ここでの編集は今回のクレジット出力だけに使われる一時的な値です。
-            名鑑（ミュージシャンDB）は変更されません。
-          </p>
+            {t("ここでの編集は今回のクレジット出力だけに使われる一時的な値です。 名鑑（ミュージシャンDB）は変更されません。")}</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {fields.map((field) => {
               const overrideValue = selection[field.key];
@@ -178,8 +177,7 @@ export function CreditSelectionEditor({
                   </Label>
                   {isLocalIcon(value) ? (
                     <p className="flex items-center gap-2 text-xs">
-                      この端末の画像
-                      <Button size="sm" onClick={() => handleFieldChange(field.key, field.baseValue, "")}>画像を外す</Button>
+                      {t("この端末の画像")}<Button size="sm" onClick={() => handleFieldChange(field.key, field.baseValue, "")}>{t("画像を外す")}</Button>
                     </p>
                   ) : (
                     <Input
@@ -194,21 +192,21 @@ export function CreditSelectionEditor({
               );
             })}
           </div>
-          <p role="status" className="text-xs">{saveStatus}</p>
+          <p role="status" className="text-xs">{t(saveStatus)}</p>
           <div className="mt-3 flex flex-wrap justify-end gap-2">
             {selection.sourceKind === "guest" && <Button size="sm" onClick={() => {
               try {
                 const saved = saveGuest(guestFromSelection(selection));
                 setSaveStatus(saved ? "この端末に保存しました。" : "端末に保存できませんでした。ブラウザの保存設定や空き容量を確認してください。");
               } catch (error) { setSaveStatus(error instanceof Error ? error.message : "保存できませんでした。"); }
-            }}>{guests.some((g) => g.id === selection.musicianId) ? "保存済みゲストを更新" : "この端末に保存"}</Button>}
+            }}>{guests.some((g) => g.id === selection.musicianId) ? t("保存済みゲストを更新") : t("この端末に保存")}</Button>}
             <Button
               variant="ghost"
               size="sm"
               disabled={!edited}
               onClick={() => onReset(selection.musicianId)}
             >
-              {selection.sourceKind === "guest" ? "追加時の内容に戻す" : "名鑑の内容に戻す"}
+              {selection.sourceKind === "guest" ? t("追加時の内容に戻す") : t("名鑑の内容に戻す")}
             </Button>
           </div>
         </div>

@@ -6,10 +6,14 @@ import type {
 import {
   normalizeLinkForOutput,
   renderCustomCreditTemplate,
+  renderPersonTemplate,
+  extractPlaceholders,
+  resolveCreditField,
   type TemplateRenderOptions,
 } from "./custom-template";
 import { resolveCreditPerson, type ResolvedCreditPerson } from "./selection";
 import { outputIconUrl } from "./guests";
+import { CREDIT_FORMAT_OPTIONS } from "./formats";
 
 /**
  * Fixed-preset credit rendering + dispatch for all output formats.
@@ -30,7 +34,25 @@ export function renderCredit(
   const ordered = [...selections].sort((a, b) => a.order - b.order);
   const people = ordered.map((s) => resolveCreditPerson(s, options));
 
+  const preset = CREDIT_FORMAT_OPTIONS.find((option) => option.value === format)?.template;
+  if (preset) {
+    const output = ordered.map((item) => preset.personTemplate.split("\n")
+      .filter((line) => {
+        const fields = extractPlaceholders(line);
+        return fields.length === 0 || fields.some((field) => resolveCreditField(item, field, options) !== "");
+      })
+      .map((line) => renderPersonTemplate(item, line, options).replace(/ — $/, ""))
+      .join("\n")).join(preset.separator);
+    return { output, warnings: [] };
+  }
+
   switch (format) {
+    case "english_markdown":
+      return { output: renderMarkdown(people.map((person) => ({ ...person, displayName: person.nameEn })), options), warnings: [] };
+    case "english_discord":
+      return { output: renderDiscord(people.map((person) => ({ ...person, nameJp: person.nameEn })), options), warnings: [] };
+    case "english_html":
+      return { output: renderWordPressHtml(people.map((person) => ({ ...person, nameJp: person.nameEn })), options), warnings: [] };
     case "emn_minimal":
       return { output: renderEmnMinimal(people, options), warnings: [] };
     case "plain_text":
@@ -55,6 +77,7 @@ export function renderCredit(
         ),
       };
     }
+    default: return { output: "", warnings: ["Unknown credit format."] };
   }
 }
 

@@ -1,4 +1,5 @@
 "use client";
+import { useTranslation } from "@/lib/i18n";
 
 import { cn } from "@/lib/utils/cn";
 
@@ -51,11 +52,12 @@ function FilterChip({
   empty?: boolean;
   onClick: () => void;
 }) {
+  const t = useTranslation();
   return (
     <button
       type="button"
       aria-pressed={active}
-      title={empty ? "該当するプロフィールがありません" : undefined}
+      title={empty ? t("該当するプロフィールがありません") : undefined}
       onClick={onClick}
       className={cn(
         "whitespace-nowrap rounded-full border px-3 py-1 text-xs transition-colors",

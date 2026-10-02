@@ -1,4 +1,5 @@
 "use client";
+import { useTranslation } from "@/lib/i18n";
 
 import Link from "next/link";
 import { X } from "lucide-react";
@@ -16,6 +17,7 @@ export function SelectedCreditBar({
   selections: CreditSelection[];
   onClear: () => void;
 }) {
+  const t = useTranslation();
   if (selections.length === 0) return null;
   const shown = selections.slice(0, 6);
   const overflow = selections.length - shown.length;
@@ -39,8 +41,7 @@ export function SelectedCreditBar({
           </div>
           <span className="truncate text-xs text-ink">
             {overflow > 0 ? `+${overflow} ` : ""}
-            {selections.length}名を選択中
-          </span>
+            {selections.length}{t("名を選択中")}</span>
         </div>
         <button
           type="button"
@@ -48,14 +49,12 @@ export function SelectedCreditBar({
           className="flex items-center gap-1 text-xs text-muted hover:text-ink"
         >
           <X className="size-3.5" />
-          クリア
-        </button>
+          {t("クリア")}</button>
         <Link
           href="/credit-builder"
           className="inline-flex h-9 shrink-0 items-center justify-center rounded-md bg-accent-strong px-4 text-xs font-medium text-white transition-opacity hover:opacity-90"
         >
-          クレジットを作成
-        </Link>
+          {t("クレジットを作成")}</Link>
       </div>
     </div>
   );

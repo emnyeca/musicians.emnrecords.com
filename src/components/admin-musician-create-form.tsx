@@ -1,4 +1,5 @@
 "use client";
+import { useTranslation } from "@/lib/i18n";
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Plus } from "lucide-react";
@@ -18,6 +19,7 @@ export function AdminMusicianCreateForm({
 }: {
   disabled: boolean;
 }) {
+  const t = useTranslation();
   const [submitting, setSubmitting] = useState(false);
   const [roles, setRoles] = useState<string[]>([]);
   const [otherRole, setOtherRole] = useState("");
@@ -70,37 +72,37 @@ export function AdminMusicianCreateForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="表示名 *" htmlFor="admin-display-name">
+        <Field label={t("表示名 *")} htmlFor="admin-display-name">
           <Input id="admin-display-name" name="displayName" required />
         </Field>
         <Field label="slug" htmlFor="admin-slug">
           <Input
             id="admin-slug"
             name="slug"
-            placeholder="未入力なら英語名から生成"
+            placeholder={t("未入力なら英語名から生成")}
           />
         </Field>
-        <Field label="日本語名 *" htmlFor="admin-name-jp">
-          <Input id="admin-name-jp" name="nameJp" required />
+        <Field label={t("日本語名（任意）")} htmlFor="admin-name-jp">
+          <Input id="admin-name-jp" name="nameJp" />
         </Field>
-        <Field label="英語名 *" htmlFor="admin-name-en">
+        <Field label={t("英語名 *")} htmlFor="admin-name-en">
           <Input id="admin-name-en" name="nameEn" required />
         </Field>
-        <Field label="正規名" htmlFor="admin-canonical-name">
+        <Field label={t("正規名")} htmlFor="admin-canonical-name">
           <Input id="admin-canonical-name" name="canonicalName" />
         </Field>
-        <Field label="並び順名" htmlFor="admin-sort-name">
+        <Field label={t("並び順名")} htmlFor="admin-sort-name">
           <Input id="admin-sort-name" name="sortName" />
         </Field>
       </div>
 
       <RolePicker roles={roles} otherRole={otherRole} onChange={(values, other) => { setRoles(values); setOtherRole(other); }} />
-      <Field label="名鑑の活動区分" htmlFor="admin-category">
+      <Field label={t("名鑑の活動区分")} htmlFor="admin-category">
         <Select id="admin-category" name="directoryCategory" defaultValue="musician"><option value="musician">Musician</option><option value="creator/staff">Creator / Staff</option></Select>
       </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="主SNS URL" htmlFor="admin-primary-sns-url">
+        <Field label={t("主SNS URL")} htmlFor="admin-primary-sns-url">
           <Input id="admin-primary-sns-url" name="primarySnsUrl" type="url" />
         </Field>
         <Field label="Web URL" htmlFor="admin-website-url">
@@ -108,7 +110,7 @@ export function AdminMusicianCreateForm({
         </Field>
       </div>
 
-      <Field label="追加リンク" htmlFor="admin-links">
+      <Field label={t("追加リンク")} htmlFor="admin-links">
         <Textarea
           id="admin-links"
           name="links"
@@ -120,22 +122,22 @@ export function AdminMusicianCreateForm({
       </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="アイコンURL" htmlFor="admin-icon-image-url">
+        <Field label={t("アイコンURL")} htmlFor="admin-icon-image-url">
           <Input id="admin-icon-image-url" name="iconImageUrl" type="url" />
         </Field>
-        <Field label="別名" htmlFor="admin-aliases">
+        <Field label={t("別名")} htmlFor="admin-aliases">
           <Input id="admin-aliases" name="aliases" placeholder="comma separated" />
         </Field>
-        <Field label="VRChat名" htmlFor="admin-vrc-name">
+        <Field label={t("VRChat名")} htmlFor="admin-vrc-name">
           <Input id="admin-vrc-name" name="vrcName" />
         </Field>
-        <Field label="Discord名" htmlFor="admin-discord-name">
+        <Field label={t("Discord名")} htmlFor="admin-discord-name">
           <Input id="admin-discord-name" name="discordName" />
         </Field>
       </div>
 
       <div className="flex flex-wrap items-end gap-4">
-        <Field label="公開状態" htmlFor="admin-visibility">
+        <Field label={t("公開状態")} htmlFor="admin-visibility">
           <Select id="admin-visibility" name="visibility" defaultValue="draft">
             <option value="draft">draft</option>
             <option value="public">public</option>
@@ -147,7 +149,7 @@ export function AdminMusicianCreateForm({
       {result ? (
         result.ok ? (
           <p className="text-sm text-muted">
-            作成しました:{" "}
+            {t("作成しました:")}{" "}
             <a
               href={result.musician.url}
               className="text-ink underline-offset-2 hover:underline"
@@ -156,14 +158,14 @@ export function AdminMusicianCreateForm({
             </a>
           </p>
         ) : (
-          <p className="text-sm text-red-600">{result.error}</p>
+          <p className="text-sm text-red-600">{t(result.error)}</p>
         )
       ) : null}
 
       <div>
         <Button type="submit" variant="solid" disabled={disabled || submitting || !roles.length}>
           <Plus className="size-4" />
-          {submitting ? "作成中..." : "メンバーを追加"}
+          {submitting ? t("作成中...") : t("メンバーを追加")}
         </Button>
       </div>
     </form>

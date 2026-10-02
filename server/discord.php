@@ -28,7 +28,7 @@ function ephemeral(string $content): array { return ['type'=>4,'data'=>message_d
 
 function modal(string $form, ?string $session, array $profile): array {
     $specs = match ($form) {
-        'basic'=>[['display_name','表示名',80,true],['name_jp','日本語名',80,true],['name_en','英語名',80,true],['roles','担当（カンマ区切り）',800,true],['primary_sns_url','主SNS URL（空欄で削除）',300,false]],
+        'basic'=>[['display_name','表示名',80,true],['name_jp','日本語名',80,false],['name_en','英語名',80,true],['roles','担当（カンマ区切り）',800,true],['primary_sns_url','主SNS URL（空欄で削除）',300,false]],
         'opt'=>[['website_url','Web URL（空欄で削除）',300,false],['icon_image_url','アイコン画像URL（空欄で削除）',300,false],['vrc_name','VRChat名',80,false],['aliases','別名義（カンマ区切り）',800,false]],
         'link'=>[['url','リンクURL',300,true],['platform','platform（空欄で自動判定）',20,false],['label','表示ラベル',80,false],['display_order','表示順（0〜999）',3,false],['delete','削除する場合「削除」と入力',10,false]],
         default=>throw new RequestError('invalid_input'),

@@ -1,4 +1,5 @@
 "use client";
+import { useTranslation } from "@/lib/i18n";
 import Link from "next/link";
 import { useEffect, useSyncExternalStore } from "react";
 import { ArrowLeft, ExternalLink } from "lucide-react";
@@ -11,18 +12,20 @@ import { displayUrl } from "@/lib/utils/sns";
 
 const subscribe = () => () => {};
 export function LiveProfile() {
+  const t = useTranslation();
   const slug = useSyncExternalStore(subscribe,
     () => decodeURIComponent(location.pathname.split('/').filter(Boolean)[1] || ''), () => null);
-  if (slug === '') return <p>ミュージシャンを一覧から選択してください。</p>;
-  return slug === null ? <p>読み込み中…</p> : <Profile slug={slug} />;
+  if (slug === '') return <p>{t("ミュージシャンを一覧から選択してください。")}</p>;
+  return slug === null ? <p>{t("読み込み中…")}</p> : <Profile slug={slug} />;
 }
 function Profile({ slug }: { slug: string }) {
+  const t = useTranslation();
   const { musicians, error } = useMusicians(slug);
   const musician = musicians?.[0];
   useEffect(() => { if (musician) document.title = `${musician.displayName} | EMN Records Musicians`; }, [musician]);
-  if (error) return <p role="alert">{error}</p>;
-  if (!musicians) return <p role="status">読み込み中…</p>;
-  if (!musician) return <p>このミュージシャンは公開されていません。</p>;
+  if (error) return <p role="alert">{t(error)}</p>;
+  if (!musicians) return <p role="status">{t("読み込み中…")}</p>;
+  if (!musician) return <p>{t("このミュージシャンは公開されていません。")}</p>;
   const links = musician.links.filter((l) => l.isPublic);
 
   return (
@@ -50,8 +53,7 @@ function Profile({ slug }: { slug: string }) {
               {musician.displayName}
             </h1>
             <p className="text-sm text-muted">
-              {musician.nameJp}
-              {musician.nameEn !== "" ? ` / ${musician.nameEn}` : ""}
+              {[musician.nameJp, musician.nameEn].filter(Boolean).filter((name, index, names) => names.indexOf(name) === index).join(" / ")}
             </p>
           </div>
 

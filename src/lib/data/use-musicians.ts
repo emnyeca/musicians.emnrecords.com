@@ -10,8 +10,8 @@ export function useMusicians(slug?: string) {
       .then(async (response) => {
         if (!response.ok) throw new Error("名鑑を読み込めませんでした。時間をおいて再度お試しください。");
         return response.json() as Promise<{ musicians: Musician[] }>;
-      }).then((data) => setMusicians(data.musicians)).catch((cause) => {
-        if (!controller.signal.aborted) setError(cause.message);
+      }).then((data) => setMusicians(data.musicians)).catch(() => {
+        if (!controller.signal.aborted) setError("名鑑を読み込めませんでした。時間をおいて再度お試しください。");
       });
     return () => controller.abort();
   }, [slug]);

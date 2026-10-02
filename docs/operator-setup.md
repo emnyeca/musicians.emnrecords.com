@@ -181,7 +181,7 @@ php scripts/import-office-drafts.php /非公開パス/people.json --apply
 php scripts/publish-confirmed-drafts.php
 ```
 
-代表者が設定済みで、本人確認後に変更されておらず、未ロックで、表示名・日本語名・英語名・役割が揃う下書きだけが`READY`になる。`HOLD`の理由を確認し、公開対象が正しい場合だけ次を実行する。
+代表者が設定済みで、本人確認後に変更されておらず、未ロックで、表示名・英語名・役割が揃う下書きだけが`READY`になる。日本語名は任意。`HOLD`の理由を確認し、公開対象が正しい場合だけ次を実行する。
 
 ```bash
 php scripts/publish-confirmed-drafts.php --apply

@@ -1,4 +1,5 @@
 "use client";
+import { useTranslation } from "@/lib/i18n";
 
 import { useEffect, useMemo, useState } from "react";
 import type { Musician } from "@/types/musician";
@@ -30,6 +31,7 @@ function rememberCreditModeInUrl(on: boolean) {
  * Cards are 2 columns on phones, up to 5 on wide screens.
  */
 export function MusicianDirectory({ musicians }: { musicians: Musician[] }) {
+  const t = useTranslation();
   const [query, setQuery] = useState("");
   const [activeRoles, setActiveRoles] = useState<string[]>([]);
   const [category, setCategory] = useState("musician");
@@ -101,15 +103,14 @@ export function MusicianDirectory({ musicians }: { musicians: Musician[] }) {
           empty={emptyRoles}
           onChange={setActiveRoles}
         />
-        {!creditMode && !query.trim() ? <Select aria-label="名鑑の活動区分" value={category} onChange={(e) => setCategory(e.target.value)}>
-          <option value="musician">Musician</option><option value="creator/staff">Creator / Staff</option><option value="all">すべて</option>
-        </Select> : <p className="text-xs text-muted">Musician・Creator / Staffすべてから検索・選択できます。</p>}
+        {!creditMode && !query.trim() ? <Select aria-label={t("名鑑の活動区分")} value={category} onChange={(e) => setCategory(e.target.value)}>
+          <option value="musician">Musician</option><option value="creator/staff">Creator / Staff</option><option value="all">{t("すべて")}</option>
+        </Select> : <p className="text-xs text-muted">{t("Musician・Creator / Staffすべてから検索・選択できます。")}</p>}
       </div>
 
       {filtered.length === 0 ? (
         <p className="py-16 text-center text-sm text-muted">
-          該当する人が見つかりませんでした。
-        </p>
+          {t("該当する人が見つかりませんでした。")}</p>
       ) : (
         <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {filtered.map((musician) => (

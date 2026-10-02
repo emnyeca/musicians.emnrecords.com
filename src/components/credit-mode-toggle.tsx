@@ -1,4 +1,5 @@
 "use client";
+import { useTranslation } from "@/lib/i18n";
 
 import { cn } from "@/lib/utils/cn";
 
@@ -13,6 +14,7 @@ export function CreditModeToggle({
   enabled: boolean;
   onChange: (enabled: boolean) => void;
 }) {
+  const t = useTranslation();
   return (
     <button
       type="button"
@@ -35,8 +37,7 @@ export function CreditModeToggle({
         />
       </span>
       <span className={cn("text-xs", enabled ? "text-ink" : "text-muted")}>
-        クレジット作成モード
-      </span>
+        {t("クレジット作成モード")}</span>
     </button>
   );
 }
